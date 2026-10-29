@@ -1,3 +1,5 @@
+<p align="center"><img src="icon-192.png" width="96" alt="ChatApp logo"></p>
+
 # ChatApp — a WhatsApp-style messenger
 
 Real-time chat where every user is **allocated a unique number** at sign-up. Users find and message each other by number.
@@ -11,7 +13,11 @@ Real-time chat where every user is **allocated a unique number** at sign-up. Use
 - Typing indicator, online status, unread counters
 - Image and file sharing
 - Offline delivery (messages are delivered when the recipient reconnects)
-- Responsive, mobile-friendly UI
+- Voice notes, emoji picker, reply-to-message, delete-for-everyone
+- Chat search, profile editing (name/about), last seen, date separators
+- Installable PWA (Add to Home Screen) with app icon, offline app shell, desktop notifications
+- Automatic dark mode, responsive mobile-friendly UI
+- Hardening: login rate limiting, message flood limit, safe file serving
 
 ## Run locally
 ```bash
@@ -31,4 +37,4 @@ git push -u origin main
 ```
 
 ## Not included yet (ideas for next steps)
-End-to-end encryption, voice/video calls, voice notes, status/stories, message delete/reply/forward, push notifications, phone-number SMS verification, and a real database (data is stored in `data/db.json`).
+End-to-end encryption, voice/video calls, status/stories, message forwarding/editing, background push notifications, phone-number SMS verification, and a real database (data is stored in `data/db.json`).
