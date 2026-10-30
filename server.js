@@ -14,7 +14,9 @@ const save = () => { clearTimeout(timer); timer = setTimeout(() => fs.writeFile(
 
 const app = express(), server = http.createServer(app), io = new Server(server);
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const WEB = new Set(['index.html','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest','sw.js']);
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/:f', (req, res, next) => WEB.has(req.params.f) ? res.sendFile(path.join(__dirname, req.params.f)) : next());
 app.use('/uploads', express.static(path.join(DATA, 'uploads')));
 
 // ---- helpers ----
