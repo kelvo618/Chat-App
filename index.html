@@ -63,6 +63,25 @@ a{color:var(--g)}
  #app{grid-template-columns:1fr}#main{display:none}
  #app.open #side{display:none}#app.open #main{display:flex}
  #back{display:block}#msgs{padding:12px}.m{max-width:88%}}
+
+.av{overflow:hidden}.av img{width:100%;height:100%;object-fit:cover}
+.av.big{width:110px;height:110px;font-size:42px;margin:0 auto 8px}
+#modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:40;padding:16px}
+#modal .card{background:var(--panel);border-radius:14px;padding:20px;width:100%;max-width:360px;max-height:90vh;overflow:auto}
+#modal input{width:100%;padding:10px;margin:4px 0 10px;border:1px solid #8884;border-radius:8px}
+#modal .row{display:flex;gap:8px}#modal .row button{flex:1}
+#toast{display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;max-width:90%;text-align:center}
+#call{position:fixed;inset:0;background:#111b21;color:#fff;display:none;flex-direction:column;align-items:center;z-index:50}
+#rv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
+#call.video #rv{opacity:1}
+#lv{display:none;position:absolute;right:12px;top:12px;width:110px;height:150px;object-fit:cover;border-radius:10px;background:#000;z-index:2;transform:scaleX(-1)}
+#call.video #lv{display:block}
+#cinfo{position:relative;z-index:2;text-align:center;margin-top:15vh;margin-bottom:auto}
+#call.video.on #cinfo{display:none}
+#cinfo .av.big{background:#8886;color:#fff}
+#cbtns{position:relative;z-index:2;display:flex;gap:18px;margin-bottom:8vh;padding-bottom:env(safe-area-inset-bottom)}
+#cbtns button{width:62px;height:62px;border-radius:50%;border:0;font-size:26px;background:#ffffff30;color:#fff;cursor:pointer}
+#cbtns .end{background:#e53935}#cbtns .acc{background:#25d366}
 </style></head><body>
 <div id="auth">
  <img src="/icon.svg" alt="ChatApp">
@@ -76,7 +95,7 @@ a{color:var(--g)}
 </div>
 <div id="app">
  <div id="side">
-  <div class="top"><div class="me"><img src="/icon.svg" alt=""><div><b id="meName"></b><small id="meNum"></small></div></div>
+  <div class="top"><div class="me"><span id="meAv" onclick="editProfile()" style="cursor:pointer"></span><div><b id="meName"></b><small id="meNum"></small></div></div>
    <div><button class="ico" title="Profile" onclick="editProfile()">⚙️</button><button class="btn" onclick="newChat()">+ Chat</button> <button class="btn alt" onclick="newGroup()">Group</button></div></div>
   <input id="q" placeholder="Search chats" oninput="renderList()">
   <div id="list"></div>
@@ -84,7 +103,7 @@ a{color:var(--g)}
  <div id="main">
   <div id="empty"><img src="/icon.svg" alt=""><p>Select a chat or start one with a number</p></div>
   <div id="pane">
-   <div id="head"><button id="back" class="ico" onclick="closeChat()">←</button><div class="av" id="hav"></div><div><b id="hname"></b><small id="hsub" class="sub" style="display:block"></small></div></div>
+   <div id="head"><button id="back" class="ico" onclick="closeChat()">←</button><div class="av" id="hav" onclick="showContact()" style="cursor:pointer"></div><div onclick="showContact()" style="cursor:pointer;min-width:0"><b id="hname"></b><small id="hsub" class="sub" style="display:block"></small></div><span id="calls" style="margin-left:auto;white-space:nowrap"><button class="ico" onclick="startCall(false)" title="Voice call">📞</button><button class="ico" onclick="startCall(true)" title="Video call">🎥</button></span></div>
    <div id="msgs"></div>
    <div id="replybar"><span id="replytxt"></span><span style="cursor:pointer" onclick="clearReply()">✕</span></div>
    <div id="emoji"></div>
@@ -95,6 +114,10 @@ a{color:var(--g)}
   </div>
  </div>
 </div>
+<div id="call"><video id="rv" autoplay playsinline></video><video id="lv" autoplay playsinline muted></video>
+ <div id="cinfo"><div class="av big" id="cav"></div><h2 id="cname" style="margin:6px 0"></h2><div id="cstat"></div></div>
+ <div id="cbtns"><button id="cmute" onclick="toggleMute(this)">🎙️</button><button id="ccam" onclick="toggleCam(this)">📷</button><button id="cacc" class="acc" onclick="acceptCall()">📞</button><button class="end" onclick="hangup()">📵</button></div></div>
+<div id="modal" onclick="if(event.target===this)closeModal()"></div><div id="toast"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const $=s=>document.querySelector(s);
@@ -130,25 +153,20 @@ function start(){
   sock.on('status',({id,chat,status})=>{const m=(msgs[chat]||[]).find(x=>x.id===id);if(m){m.status=status;if(cur===chat)renderMsgs()}loadChats()});
   sock.on('typing',({chat,name})=>{if(chat!==cur)return;$('#hsub').textContent=name+' is typing…';clearTimeout(typingTimer);typingTimer=setTimeout(setSub,1500)});
   sock.on('presence',p=>{pres[p.number]=p;setSub();loadChats()});
-  sock.on('chats-changed',loadChats);
+  sock.on('chats-changed',loadChats);callSockets();ice().catch(()=>{});
   loadChats();
 }
-function showMe(){$('#meName').textContent=me.name;$('#meNum').innerHTML='+'+esc(me.number)+' · <a href="#" onclick="logout()">log out</a>'}
-async function editProfile(){
-  const name=prompt('Your name:',me.name);if(name===null)return;
-  const about=prompt('About:',me.about||'');if(about===null)return;
-  me=await api('me',{method:'PUT',body:JSON.stringify({name,about})});showMe();
-}
+function showMe(){$('#meAv').innerHTML=avHtml(me.name,me.avatar);$('#meName').textContent=me.name;$('#meNum').innerHTML='+'+esc(me.number)+' · <a href="#" onclick="logout()">log out</a>'}
 function notifyMsg(m){
   if(!('Notification' in window)||Notification.permission!=='granted'||(!document.hidden&&cur===m.chat))return;
   new Notification(chatInfo(m.chat)?.name||'New message',{body:preview(m),icon:'/icon-192.png'});
 }
-async function loadChats(){chats=await api('chats');renderList();if(cur)setSub()}
+async function loadChats(){chats=await api('chats');renderList();if(cur){setSub();const c=chatInfo(cur);if(c)$('#hav').innerHTML=avIn(c.name,c.avatar)}}
 function renderList(){
   const q=$('#q').value.toLowerCase();
   const shown=chats.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.number||'').includes(q));
   $('#list').innerHTML=shown.map(c=>`<div class="chat ${c.id===cur?'on':''}" onclick="openChat('${c.id}')">
-   <div class="av">${esc((c.name||'?')[0].toUpperCase())}</div>
+   <div class="av">${avIn(c.name,c.avatar)}</div>
    <div class="mid"><div><b>${esc(c.name)}</b></div><div class="sub">${c.last?(c.last.from===me.number?tick(c.last.status)+' ':'')+esc(preview(c.last)):'No messages yet'}</div></div>
    ${c.unread?`<span class="badge">${c.unread}</span>`:''}</div>`).join('')||'<p class="sub" style="padding:16px">No chats yet. Tap “+ Chat” and enter a number.</p>';
 }
@@ -161,7 +179,7 @@ function setSub(){
 }
 async function openChat(id){
   cur=id;clearReply();$('#empty').style.display='none';$('#pane').style.display='flex';$('#app').classList.add('open');
-  const c=chatInfo(id);$('#hname').textContent=c.name;$('#hav').textContent=c.name[0].toUpperCase();setSub();
+  const c=chatInfo(id);$('#hname').textContent=c.name;$('#hav').innerHTML=avIn(c.name,c.avatar);$('#calls').style.display=c.group?'none':'';setSub();
   msgs[id]=await api('messages?chat='+encodeURIComponent(id));
   renderMsgs();sock.emit('read',{chat:id});
   c.unread=0;renderList();$('#txt').focus();
@@ -217,6 +235,133 @@ async function newGroup(){
   const name=prompt('Group name:');if(!name)return;
   const nums=(prompt('Member numbers, comma-separated:')||'').split(',').map(s=>s.trim()).filter(Boolean);
   try{const g=await api('groups',{method:'POST',body:JSON.stringify({name,members:nums})});await loadChats();openChat(g.id)}catch(e){alert(e.message)}
+}
+// ---------- avatars, profile, contact info ----------
+const avIn=(n,u)=>u?`<img src="${esc(u)}" alt="">`:esc((n||'?')[0].toUpperCase());
+const avHtml=(n,u,c='')=>`<div class="av ${c}">${avIn(n,u)}</div>`;
+function openModal(html){$('#modal').innerHTML=`<div class="card">${html}</div>`;$('#modal').style.display='flex'}
+function closeModal(){$('#modal').style.display='none'}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
+function editProfile(){
+  openModal(`<div style="text-align:center"><div onclick="$('#pfile').click()" style="cursor:pointer">${avHtml(me.name,me.avatar,'big')}</div>
+   <button class="btn alt" onclick="$('#pfile').click()">Change photo</button> ${me.avatar?'<button class="btn alt" onclick="setAvatar(null)">Remove</button>':''}</div>
+   <label class="sub">Name</label><input id="pname" value="${esc(me.name)}" maxlength="40">
+   <label class="sub">About</label><input id="pabout" value="${esc(me.about||'')}" maxlength="140">
+   <p class="sub">Your number: +${esc(me.number)}</p>
+   <div class="row"><button class="btn" onclick="saveProfile()">Save</button><button class="btn alt" onclick="closeModal()">Close</button></div>
+   <input type="file" id="pfile" accept="image/*" hidden onchange="pickAvatar(this)">`);
+}
+async function saveProfile(){
+  try{me=await api('me',{method:'PUT',body:JSON.stringify({name:$('#pname').value.trim()||me.name,about:$('#pabout').value})});showMe();closeModal()}catch(e){toast(e.message)}
+}
+async function pickAvatar(inp){
+  const f=inp.files[0];if(!f)return;
+  try{
+    const bmp=await createImageBitmap(f),S=256,cv=document.createElement('canvas');cv.width=cv.height=S;
+    const m=Math.min(bmp.width,bmp.height);
+    cv.getContext('2d').drawImage(bmp,(bmp.width-m)/2,(bmp.height-m)/2,m,m,0,0,S,S);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.85));
+    const fd=new FormData();fd.append('file',new File([blob],'avatar.jpg',{type:'image/jpeg'}));
+    const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw 0;
+    await setAvatar((await r.json()).url);
+  }catch{toast('Could not use that photo')}
+  inp.value='';
+}
+async function setAvatar(url){me=await api('me',{method:'PUT',body:JSON.stringify({avatar:url})});showMe();editProfile()}
+async function showContact(){
+  const c=chatInfo(cur);if(!c)return;
+  if(c.group)return openModal(`<div style="text-align:center">${avHtml(c.name,null,'big')}<h3 style="margin:4px 0">${esc(c.name)}</h3></div><p class="sub">${c.members.length} members</p>${c.members.map(n=>`<div>+${esc(n)}</div>`).join('')}<div class="row" style="margin-top:12px"><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+  let u={};try{u=await api('users/'+c.number)}catch{}
+  openModal(`<div style="text-align:center">${avHtml(c.name,u.avatar||c.avatar,'big')}<h3 style="margin:4px 0">${esc(c.name)}</h3><div class="sub">+${esc(c.number)}</div><p>${esc(u.about||'')}</p></div>
+   <div class="row"><button class="btn" onclick="closeModal();startCall(false)">📞 Voice</button><button class="btn" onclick="closeModal();startCall(true)">🎥 Video</button></div>
+   <div class="row" style="margin-top:8px"><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+}
+
+// ---------- voice & video calls (WebRTC; signalling over Socket.IO) ----------
+let pc,localStream,callPeer=null,callState='idle',callVideo=false,pendingIce=[],callTimer,durT,iceCfg,ringCtx,ringT;
+const ice=async()=>iceCfg||(iceCfg=(await api('ice')).iceServers);
+function ring(on){
+  clearInterval(ringT);if(!on)return;
+  const beep=()=>{try{ringCtx=ringCtx||new AudioContext();const o=ringCtx.createOscillator(),g=ringCtx.createGain();o.frequency.value=440;g.gain.value=.15;o.connect(g);g.connect(ringCtx.destination);o.start();o.stop(ringCtx.currentTime+.4)}catch{}if(navigator.vibrate)navigator.vibrate(300)};
+  beep();ringT=setInterval(beep,1500);
+}
+function ui(incoming){
+  $('#cacc').style.display=incoming?'':'none';
+  $('#cmute').style.display=incoming?'none':'';
+  $('#ccam').style.display=(!incoming&&callVideo)?'':'none';
+}
+function showCall(name,avatar,stat){
+  $('#cav').innerHTML=avIn(name,avatar);$('#cname').textContent=name;$('#cstat').textContent=stat;
+  $('#cmute').textContent='🎙️';$('#ccam').textContent='📷';
+  $('#call').classList.remove('on');$('#call').classList.toggle('video',callVideo);$('#call').style.display='flex';
+}
+const media=video=>navigator.mediaDevices.getUserMedia({audio:true,video:video?{facingMode:'user'}:false});
+async function startCall(video){
+  const c=chatInfo(cur);if(!c||c.group||callState!=='idle')return;
+  if(!navigator.mediaDevices?.getUserMedia)return toast('Calls need a secure (https) page and a supported browser');
+  try{localStream=await media(video)}catch{return toast('Allow microphone'+(video?' and camera':'')+' access to call')}
+  callPeer=c.number;callVideo=video;callState='calling';
+  showCall(c.name,c.avatar,'Calling…');ui(false);$('#lv').srcObject=video?localStream:null;
+  sock.emit('call:invite',{to:c.number,video},r=>{if(r?.error){endCall(null,r.error)}});
+  callTimer=setTimeout(()=>{if(callState==='calling')endCall('call:end','No answer')},45000);
+}
+async function acceptCall(){
+  ring(false);
+  try{localStream=await media(callVideo)}catch{endCall('call:reject');return toast('Allow microphone'+(callVideo?' and camera':'')+' access to answer')}
+  callState='connecting';ui(false);$('#cstat').textContent='Connecting…';$('#lv').srcObject=callVideo?localStream:null;
+  sock.emit('call:accept',{to:callPeer});
+}
+const hangup=()=>endCall(callState==='ringing'?'call:reject':'call:end');
+function endCall(evt,msg){
+  clearTimeout(callTimer);clearInterval(durT);ring(false);
+  if(evt&&callPeer)sock.emit(evt,{to:callPeer});
+  try{pc&&pc.close()}catch{}pc=null;
+  localStream&&localStream.getTracks().forEach(t=>t.stop());localStream=null;
+  callPeer=null;callState='idle';pendingIce=[];
+  $('#call').style.display='none';$('#rv').srcObject=null;$('#lv').srcObject=null;
+  if(msg)toast(msg);
+}
+function toggleMute(b){const t=localStream?.getAudioTracks()[0];if(t){t.enabled=!t.enabled;b.textContent=t.enabled?'🎙️':'🔇'}}
+function toggleCam(b){const t=localStream?.getVideoTracks()[0];if(t){t.enabled=!t.enabled;b.textContent=t.enabled?'📷':'🚫'}}
+async function makePc(){
+  const p=pc=new RTCPeerConnection({iceServers:await ice()});
+  localStream.getTracks().forEach(t=>p.addTrack(t,localStream));
+  p.onicecandidate=e=>{if(e.candidate&&callPeer)sock.emit('call:signal',{to:callPeer,data:{candidate:e.candidate}})};
+  p.ontrack=e=>{$('#rv').srcObject=e.streams[0]};
+  p.onconnectionstatechange=()=>{
+    if(p!==pc)return;
+    if(p.connectionState==='connected'&&callState!=='active'){
+      callState='active';clearTimeout(callTimer);$('#call').classList.add('on');
+      const t0=Date.now();durT=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);$('#cstat').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')},1000);
+    }
+    if(p.connectionState==='failed')endCall('call:end','Call failed. Your network may be blocking direct calls.');
+  };
+}
+async function flushIce(){for(const c of pendingIce)await pc.addIceCandidate(c).catch(()=>{});pendingIce=[]}
+function callSockets(){
+  sock.on('call:incoming',({from,name,avatar,video})=>{
+    if(callState!=='idle'){sock.emit('call:reject',{to:from});return}
+    callPeer=from;callVideo=video;callState='ringing';
+    showCall(name,avatar,video?'Incoming video call…':'Incoming voice call…');ui(true);ring(true);
+  });
+  sock.on('call:accepted',async({from})=>{
+    if(from!==callPeer||callState!=='calling')return;
+    clearTimeout(callTimer);callState='connecting';$('#cstat').textContent='Connecting…';
+    try{await makePc();const o=await pc.createOffer();await pc.setLocalDescription(o);sock.emit('call:signal',{to:callPeer,data:{sdp:pc.localDescription}})}catch{endCall('call:end','Could not start the call')}
+  });
+  sock.on('call:signal',async({from,data})=>{
+    if(from!==callPeer)return;
+    try{
+      if(data.sdp&&data.sdp.type==='offer'){
+        await makePc();await pc.setRemoteDescription(data.sdp);await flushIce();
+        const a=await pc.createAnswer();await pc.setLocalDescription(a);
+        sock.emit('call:signal',{to:callPeer,data:{sdp:pc.localDescription}});
+      }else if(data.sdp){await pc.setRemoteDescription(data.sdp);await flushIce()}
+      else if(data.candidate){if(pc&&pc.remoteDescription)await pc.addIceCandidate(data.candidate).catch(()=>{});else pendingIce.push(data.candidate)}
+    }catch(e){console.error(e)}
+  });
+  sock.on('call:rejected',({from})=>{if(from===callPeer)endCall(null,'Call declined')});
+  sock.on('call:ended',({from})=>{if(from===callPeer)endCall(null,callState==='ringing'?'Missed call':'Call ended')});
 }
 init();
 </script></body></html>

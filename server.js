@@ -51,7 +51,7 @@ const fails = new Map(); setInterval(() => fails.clear(), 15 * 60 * 1000).unref(
 // ---- helpers ----
 const uid = () => crypto.randomUUID().slice(0, 8);
 const userBy = n => db.users.find(u => u.number === n);
-const pub = u => ({ number: u.number, name: u.name, about: u.about, lastSeen: u.lastSeen });
+const pub = u => ({ number: u.number, name: u.name, about: u.about, avatar: u.avatar || null, lastSeen: u.lastSeen });
 const sign = u => jwt.sign({ number: u.number }, SECRET, { expiresIn: '30d' });
 const dmId = (a, b) => ['dm', ...[a, b].sort()].join(':');
 const members = chat => chat.startsWith('g:')
@@ -65,6 +65,8 @@ const status = m => {
 };
 const out = m => ({ ...m, status: status(m) });
 const online = new Map();
+const peer = new Map(); // number -> number they are ringing / in a call with
+const dropCall = (n, ev) => { const o = peer.get(n); if (o) { peer.delete(n); peer.delete(o); if (ev) io.to(o).emit(ev, { from: n }); } };
 
 const auth = (req, res, next) => {
   try {
@@ -91,11 +93,19 @@ app.get('/api/me', auth, (req, res) => res.json(pub(req.user)));
 app.put('/api/me', auth, (req, res) => {
   if (req.body.name) req.user.name = String(req.body.name).slice(0, 40);
   if (req.body.about != null) req.user.about = String(req.body.about).slice(0, 140);
-  save(); res.json(pub(req.user));
+  if (req.body.avatar !== undefined) req.user.avatar = /^\/uploads\/[\w.\-]+$/.test(req.body.avatar || '') ? req.body.avatar : null;
+  save(); io.emit('chats-changed'); res.json(pub(req.user));
 });
 app.get('/api/users/:number', auth, (req, res) => {
   const u = userBy(req.params.number.replace(/\D/g, ''));
   u ? res.json({ ...pub(u), online: online.has(u.number) }) : res.status(404).json({ error: 'No user with that number' });
+});
+
+// ICE servers for calls. Add TURN_URL / TURN_USER / TURN_PASS env vars for reliable calls on mobile networks.
+app.get('/api/ice', auth, (req, res) => {
+  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (process.env.TURN_URL) iceServers.push({ urls: process.env.TURN_URL.split(','), username: process.env.TURN_USER, credential: process.env.TURN_PASS });
+  res.json({ iceServers });
 });
 
 // ---- chats, messages, groups ----
@@ -110,7 +120,7 @@ app.get('/api/chats', auth, (req, res) => {
   const list = Object.values(map).map(c => {
     const r = { id: c.id, unread: c.unread, last: c.last && out(c.last) };
     if (c.id.startsWith('g:')) { const g = db.groups.find(x => x.id === c.id.slice(2)); Object.assign(r, { group: true, name: g.name, members: g.members }); }
-    else { const o = userBy(members(c.id).find(x => x !== me)); Object.assign(r, { name: o.name, number: o.number, online: online.has(o.number) }); }
+    else { const o = userBy(members(c.id).find(x => x !== me)); Object.assign(r, { name: o.name, number: o.number, avatar: o.avatar || null, about: o.about, online: online.has(o.number) }); }
     return r;
   });
   res.json(list.sort((a, b) => (b.last?.ts || 0) - (a.last?.ts || 0)));
@@ -184,6 +194,21 @@ io.on('connection', s => {
       }
     }); save();
   });
+  // ---- voice/video call signalling (media flows peer-to-peer via WebRTC) ----
+  s.on('call:invite', ({ to, video }, ack) => {
+    to = String(to || '');
+    if (!userBy(to) || to === me) return ack && ack({ error: 'Invalid number' });
+    if (!online.has(to)) return ack && ack({ error: 'They are offline right now' });
+    if (peer.has(to) || peer.has(me)) return ack && ack({ error: 'Line busy' });
+    peer.set(me, to); peer.set(to, me);
+    const u = userBy(me);
+    io.to(to).emit('call:incoming', { from: me, name: u.name, avatar: u.avatar || null, video: !!video });
+    ack && ack({ ok: true });
+  });
+  s.on('call:accept', ({ to }) => { if (peer.get(me) === to) io.to(to).emit('call:accepted', { from: me }); });
+  s.on('call:signal', ({ to, data }) => { if (peer.get(me) === to && data) io.to(to).emit('call:signal', { from: me, data }); });
+  s.on('call:reject', ({ to }) => { if (peer.get(me) === to) dropCall(me, 'call:rejected'); });
+  s.on('call:end', ({ to }) => { if (peer.get(me) === to) dropCall(me, 'call:ended'); });
   s.on('delete', ({ id }) => {  // delete for everyone (sender only)
     const m = db.messages.find(x => x.id === id);
     if (!m || m.from !== me) return;
@@ -193,7 +218,7 @@ io.on('connection', s => {
   s.on('disconnect', () => {
     const c = (online.get(me) || 1) - 1;
     if (c) return online.set(me, c);
-    online.delete(me); userBy(me).lastSeen = Date.now(); save();
+    online.delete(me); dropCall(me, 'call:ended'); userBy(me).lastSeen = Date.now(); save();
     io.emit('presence', { number: me, online: false, lastSeen: userBy(me).lastSeen });
   });
 });

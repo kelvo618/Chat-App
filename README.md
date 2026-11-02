@@ -36,5 +36,14 @@ git remote add origin https://github.com/<your-username>/chatapp.git
 git push -u origin main
 ```
 
+## Profiles and calls
+- Profile page: tap your avatar (top left) to change photo, name and about. Tap a chat header to see a contact's profile.
+- Voice and video calls (WebRTC, signalled over Socket.IO) from the chat header or the contact card.
+- Calls need HTTPS (Render provides it) and microphone/camera permission.
+- For reliable calls across mobile networks, set a TURN relay on the server: `TURN_URL` (comma-separated, e.g. `turn:host:80,turns:host:443`), `TURN_USER`, `TURN_PASS`. Without TURN, calls use public STUN only and may fail on some carriers.
+
+## Persistent storage (Postgres)
+Set `DATABASE_URL` to a Postgres connection string (e.g. a free Neon database) and all accounts, messages and uploaded files are stored there and survive restarts. Without it, the app falls back to a local `data/` folder (fine for development).
+
 ## Not included yet (ideas for next steps)
 End-to-end encryption, voice/video calls, status/stories, message forwarding/editing, background push notifications, phone-number SMS verification, and a real database (data is stored in `data/db.json`).
