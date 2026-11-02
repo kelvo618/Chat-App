@@ -3,21 +3,50 @@ const crypto = require('crypto');
 const { Server } = require('socket.io'), bcrypt = require('bcryptjs'), jwt = require('jsonwebtoken'), multer = require('multer');
 
 const SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+const { Pool } = require('pg');
 const DATA = path.join(__dirname, 'data'), DB_FILE = path.join(DATA, 'db.json');
 fs.mkdirSync(path.join(DATA, 'uploads'), { recursive: true });
 
-// ---- tiny JSON "database" (swap for SQLite/Postgres in production) ----
+// ---- storage: Postgres when DATABASE_URL is set, otherwise a local JSON file (dev) ----
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
 let db = { users: [], messages: [], groups: [], nextNumber: 7000000001 };
-if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
 let timer;
-const save = () => { clearTimeout(timer); timer = setTimeout(() => fs.writeFile(DB_FILE, JSON.stringify(db), () => {}), 200); };
+async function flush() {
+  clearTimeout(timer);
+  if (pool) await pool.query("insert into kv(key,value) values('db',$1) on conflict(key) do update set value=excluded.value", [JSON.stringify(db)]);
+  else fs.writeFileSync(DB_FILE, JSON.stringify(db));
+}
+const save = () => { clearTimeout(timer); timer = setTimeout(() => flush().catch(e => console.error('save failed:', e.message)), 300); };
+async function loadDb() {
+  if (pool) {
+    await pool.query('create table if not exists kv(key text primary key, value jsonb not null)');
+    await pool.query('create table if not exists files(id text primary key, name text, type text, data bytea)');
+    const r = await pool.query("select value from kv where key='db'");
+    if (r.rows[0]) db = r.rows[0].value;
+  } else if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+}
+process.on('SIGTERM', async () => { try { await flush(); } catch (e) { console.error(e); } process.exit(0); });
 
 const app = express(), server = http.createServer(app), io = new Server(server);
 app.use(express.json());
-const WEB = new Set(['index.html','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest','sw.js']);
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
+// flat layout: only these files are public (server.js and data/ stay private)
+const WEB = new Set(['index.html', 'icon.svg', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'sw.js']);
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/:f', (req, res, next) => WEB.has(req.params.f) ? res.sendFile(path.join(__dirname, req.params.f)) : next());
-app.use('/uploads', express.static(path.join(DATA, 'uploads')));
+const SAFE = /^(image\/(png|jpe?g|gif|webp)|audio\/|video\/(mp4|webm)|application\/pdf)/;
+if (pool) app.get('/uploads/:id', async (req, res) => {
+  try {
+    const r = await pool.query('select name,type,data from files where id=$1', [req.params.id]);
+    const f = r.rows[0]; if (!f) return res.sendStatus(404);
+    res.setHeader('Content-Type', SAFE.test(f.type) ? f.type : 'application/octet-stream');
+    if (!SAFE.test(f.type)) res.setHeader('Content-Disposition', 'attachment');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(f.data);
+  } catch { res.sendStatus(500); }
+});
+else app.use('/uploads', express.static(path.join(DATA, 'uploads'), { setHeaders: (res, f) => { if (!/\.(png|jpe?g|gif|webp|webm|ogg|mp3|m4a|mp4|pdf)$/i.test(f)) res.setHeader('Content-Disposition', 'attachment'); } }));
+const fails = new Map(); setInterval(() => fails.clear(), 15 * 60 * 1000).unref();
 
 // ---- helpers ----
 const uid = () => crypto.randomUUID().slice(0, 8);
@@ -53,8 +82,9 @@ app.post('/api/signup', async (req, res) => {
   res.json({ token: sign(u), user: pub(u) });
 });
 app.post('/api/login', async (req, res) => {
+  if ((fails.get(req.ip) || 0) >= 10) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
   const u = userBy(String(req.body.number || '').replace(/\D/g, ''));
-  if (!u || !(await bcrypt.compare(String(req.body.password || ''), u.hash))) return res.status(400).json({ error: 'Wrong number or password' });
+  if (!u || !(await bcrypt.compare(String(req.body.password || ''), u.hash))) { fails.set(req.ip, (fails.get(req.ip) || 0) + 1); return res.status(400).json({ error: 'Wrong number or password' }); }
   res.json({ token: sign(u), user: pub(u) });
 });
 app.get('/api/me', auth, (req, res) => res.json(pub(req.user)));
@@ -97,12 +127,22 @@ app.post('/api/groups', auth, (req, res) => {
   nums.forEach(n => io.to(n).emit('chats-changed'));
   res.json({ id: 'g:' + g.id });
 });
-const upload = multer({ storage: multer.diskStorage({
+const upload = multer({ storage: pool ? multer.memoryStorage() : multer.diskStorage({
   destination: path.join(DATA, 'uploads'),
   filename: (r, f, cb) => cb(null, uid() + uid() + path.extname(f.originalname).slice(0, 8).replace(/[^.\w]/g, ''))
 }), limits: { fileSize: 15 * 1024 * 1024 } });
-app.post('/api/upload', auth, upload.single('file'), (req, res) =>
-  res.json({ url: '/uploads/' + req.file.filename, name: req.file.originalname, type: req.file.mimetype }));
+app.post('/api/upload', auth, upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file' });
+  try {
+    let url;
+    if (pool) {
+      const id = uid() + uid();
+      await pool.query('insert into files(id,name,type,data) values($1,$2,$3,$4)', [id, req.file.originalname, req.file.mimetype, req.file.buffer]);
+      url = '/uploads/' + id;
+    } else url = '/uploads/' + req.file.filename;
+    res.json({ url, name: req.file.originalname, type: req.file.mimetype });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Upload failed' }); }
+});
 
 // ---- realtime ----
 io.use((s, next) => {
@@ -119,11 +159,14 @@ io.on('connection', s => {
     if (m.from !== me && members(m.chat).includes(me) && !m.deliveredTo.includes(me)) { m.deliveredTo.push(me); notify(m, m.chat); }
   }); save();
 
-  s.on('send', ({ chat, text, file }, ack) => {
+  s.on('send', ({ chat, text, file, replyTo }, ack) => {
+    const now = Date.now(); s.hits = (s.hits || []).filter(t => now - t < 10000);
+    if (s.hits.length >= 15) return ack && ack({ error: 'Slow down a little' });
+    s.hits.push(now);
     const mem = members(String(chat || ''));
     text = String(text || '').slice(0, 4000);
     if (!mem.includes(me) || (!text && !file) || mem.some(n => !userBy(n))) return ack && ack({ error: 'Cannot send' });
-    const m = { id: uid() + uid(), chat, from: me, text, file: file || null, ts: Date.now(),
+    const m = { id: uid() + uid(), chat, from: me, text, file: file || null, ts: Date.now(), replyTo: db.messages.some(x => x.id === replyTo && x.chat === chat) ? replyTo : null,
       deliveredTo: mem.filter(n => n !== me && online.has(n)), readBy: [me] };
     db.messages.push(m); save();
     mem.forEach(n => io.to(n).emit('message', out(m)));
@@ -141,6 +184,12 @@ io.on('connection', s => {
       }
     }); save();
   });
+  s.on('delete', ({ id }) => {  // delete for everyone (sender only)
+    const m = db.messages.find(x => x.id === id);
+    if (!m || m.from !== me) return;
+    Object.assign(m, { deleted: true, text: '', file: null }); save();
+    members(m.chat).forEach(n => io.to(n).emit('message-updated', out(m)));
+  });
   s.on('disconnect', () => {
     const c = (online.get(me) || 1) - 1;
     if (c) return online.set(me, c);
@@ -150,4 +199,5 @@ io.on('connection', s => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('ChatApp running on http://localhost:' + PORT));
+loadDb().then(() => server.listen(PORT, () => console.log('ChatApp running on port ' + PORT + (pool ? ' (Postgres)' : ' (local file storage)'))))
+  .catch(e => { console.error('Database error:', e.message); process.exit(1); });
