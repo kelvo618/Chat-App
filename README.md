@@ -1,6 +1,8 @@
-<p align="center"><img src="icon-192.png" width="96" alt="ChatApp logo"></p>
+<p align="center"><img src="icon-192.png" width="96" alt="PHANTOM LINK logo"></p>
 
-# ChatApp — a WhatsApp-style messenger
+# PHANTOM LINK — Connect without limits.
+
+*One network. Endless connections.* A real-time messenger with a unique number per user.
 
 Real-time chat where every user is **allocated a unique number** at sign-up. Users find and message each other by number.
 
@@ -30,7 +32,7 @@ Set `JWT_SECRET` (and optionally `PORT`) as environment variables in production.
 ```bash
 git init
 git add .
-git commit -m "Initial commit: ChatApp"
+git commit -m "Initial commit: PHANTOM LINK"
 git branch -M main
 git remote add origin https://github.com/<your-username>/chatapp.git
 git push -u origin main

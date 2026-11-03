@@ -1,5 +1,5 @@
 {
-  "name": "chatapp",
+  "name": "phantom-link",
   "version": "1.0.0",
   "description": "WhatsApp-style real-time messenger with a unique number per user",
   "main": "server.js",

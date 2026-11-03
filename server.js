@@ -79,7 +79,7 @@ const auth = (req, res, next) => {
 app.post('/api/signup', async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 40), pw = String(req.body.password || '');
   if (!name || pw.length < 6) return res.status(400).json({ error: 'Name and a password of 6+ characters required' });
-  const u = { number: String(db.nextNumber++), name, about: 'Hey there! I am using ChatApp.', hash: await bcrypt.hash(pw, 10), lastSeen: Date.now() };
+  const u = { number: String(db.nextNumber++), name, about: 'Hey there! I am using PHANTOM LINK.', hash: await bcrypt.hash(pw, 10), lastSeen: Date.now() };
   db.users.push(u); save();
   res.json({ token: sign(u), user: pub(u) });
 });
@@ -224,5 +224,5 @@ io.on('connection', s => {
 });
 
 const PORT = process.env.PORT || 3000;
-loadDb().then(() => server.listen(PORT, () => console.log('ChatApp running on port ' + PORT + (pool ? ' (Postgres)' : ' (local file storage)'))))
+loadDb().then(() => server.listen(PORT, () => console.log('PHANTOM LINK running on port ' + PORT + (pool ? ' (Postgres)' : ' (local file storage)'))))
   .catch(e => { console.error('Database error:', e.message); process.exit(1); });

@@ -1,13 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#008069">
+<meta name="theme-color" content="#05060f">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg"><link rel="apple-touch-icon" href="/icon-192.png">
-<title>ChatApp</title>
+<title>PHANTOM LINK</title>
 <style>
-:root{--g:#008069;--bg:#efeae2;--me:#d9fdd3;--line:#e9edef;--panel:#fff;--bar:#f0f2f5;--txt:#111b21;--sub:#667781;--in:#fff}
-@media(prefers-color-scheme:dark){:root{--bg:#0b141a;--me:#005c4b;--line:#222d34;--panel:#111b21;--bar:#202c33;--txt:#e9edef;--sub:#8696a0;--in:#202c33}}
+:root{color-scheme:dark;--g:#2f80ff;--p:#b44dff;--bg:#070816;--me:#2358d6;--line:#1b1f3a;--panel:#0d0f22;--bar:#12142b;--txt:#eef0ff;--sub:#8b90b8;--in:#171a35}
 *{box-sizing:border-box}
 body{margin:0;font:15px system-ui,sans-serif;height:100vh;height:100dvh;background:var(--bar);color:var(--txt)}
 button,input{font:inherit;color:inherit}
@@ -60,7 +59,7 @@ a{color:var(--g)}
 #bar input[type=text]{flex:1;padding:10px 14px;border:0;border-radius:20px}
 #bar label{cursor:pointer;font-size:20px}
 @media(max-width:700px){
- #app{grid-template-columns:1fr}#main{display:none}
+ #app{grid-template-columns:minmax(0,1fr)}#main{display:none}
  #app.open #side{display:none}#app.open #main{display:flex}
  #back{display:block}#msgs{padding:12px}.m{max-width:88%}}
 
@@ -82,26 +81,55 @@ a{color:var(--g)}
 #cbtns{position:relative;z-index:2;display:flex;gap:18px;margin-bottom:8vh;padding-bottom:env(safe-area-inset-bottom)}
 #cbtns button{width:62px;height:62px;border-radius:50%;border:0;font-size:26px;background:#ffffff30;color:#fff;cursor:pointer}
 #cbtns .end{background:#e53935}#cbtns .acc{background:#25d366}
+
+body{background:#05060f;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.btn{background:linear-gradient(135deg,var(--g),var(--p));box-shadow:0 0 14px #2f80ff44}
+.btn.alt{background:transparent;color:#8fb8ff;border:1px solid #2f80ff88;box-shadow:none}
+a{color:#8fb8ff}
+.brand{margin:8px 0 2px;font-weight:800;letter-spacing:3px;background:linear-gradient(90deg,#4aa8ff,#b44dff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag{font-size:12px;letter-spacing:3px;color:#8fb8ff;margin-bottom:10px}
+.slogan{font-size:10px;letter-spacing:2px;color:#6d72a0;margin:6px 0 0}
+#auth{background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(135deg,var(--g),var(--p)) border-box;border:1px solid transparent;box-shadow:0 0 40px #5b3bff33}
+#auth img,#empty img{box-shadow:0 0 30px #7a4dff66}
+.brandbar{display:flex;align-items:center;gap:8px;padding:10px 12px 0;font-weight:800;letter-spacing:3px;font-size:12px;color:#cfd3ff}
+.brandbar img{width:24px;height:24px;border-radius:7px}
+.chat:hover,.chat.on{background:#171a35}
+.av{background:linear-gradient(135deg,#1d3a8a,#5b2bb3);color:#fff}
+.badge{background:linear-gradient(135deg,var(--g),var(--p))}
+#main{background:radial-gradient(circle at 15% 0%,#16164a66,transparent 55%),radial-gradient(circle at 95% 100%,#3a1a7a55,transparent 55%),var(--bg)}
+.m{box-shadow:0 1px 6px #0006}
+.m.me{background:linear-gradient(135deg,#2358d6,#7a3df0);color:#fff;box-shadow:0 0 14px #6a4cff44}
+.m.me .t,.m.me .q{color:#dfe2ff}
+.m .who{color:#c08aff}
+.m .q{border-left-color:var(--p)}
+.tick.read{color:#4de1ff}
+.day{background:#171a35;color:#9aa0d0}
+#head,.top,#bar,#replybar,#emoji{background:var(--bar)}
+#call{background:radial-gradient(circle at 50% 0%,#1d2160,#05060f 70%)}
+#side,#main,#pane{min-width:0}#bar input[type=text]{min-width:0}#head>div{min-width:0}#hname{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style></head><body>
 <div id="auth">
- <img src="/icon.svg" alt="ChatApp">
- <h2 style="margin:8px 0;color:var(--g)">ChatApp</h2>
+ <img src="/icon.svg" alt="PHANTOM LINK">
+ <h2 class="brand">PHANTOM LINK</h2>
+ <div class="tag">CONNECT WITHOUT LIMITS.</div>
  <input id="name" placeholder="Your name (sign up only)">
  <input id="num" placeholder="Your number (log in only)" inputmode="numeric">
  <input id="pw" type="password" placeholder="Password (6+ characters)">
  <div id="err"></div>
  <div class="row"><button class="btn" onclick="authGo('login')">Log in</button><button class="btn alt" onclick="authGo('signup')">Sign up</button></div>
  <p class="sub">Signing up allocates you a unique number. Friends use it to message you.</p>
+ <p class="slogan">ONE NETWORK. ENDLESS CONNECTIONS.</p>
 </div>
 <div id="app">
  <div id="side">
+  <div class="brandbar"><img src="/icon.svg" alt=""> PHANTOM LINK</div>
   <div class="top"><div class="me"><span id="meAv" onclick="editProfile()" style="cursor:pointer"></span><div><b id="meName"></b><small id="meNum"></small></div></div>
    <div><button class="ico" title="Profile" onclick="editProfile()">⚙️</button><button class="btn" onclick="newChat()">+ Chat</button> <button class="btn alt" onclick="newGroup()">Group</button></div></div>
   <input id="q" placeholder="Search chats" oninput="renderList()">
   <div id="list"></div>
  </div>
  <div id="main">
-  <div id="empty"><img src="/icon.svg" alt=""><p>Select a chat or start one with a number</p></div>
+  <div id="empty"><img src="/icon.svg" alt=""><h3 class="brand">PHANTOM LINK</h3><p>Select a chat or start one with a number</p></div>
   <div id="pane">
    <div id="head"><button id="back" class="ico" onclick="closeChat()">←</button><div class="av" id="hav" onclick="showContact()" style="cursor:pointer"></div><div onclick="showContact()" style="cursor:pointer;min-width:0"><b id="hname"></b><small id="hsub" class="sub" style="display:block"></small></div><span id="calls" style="margin-left:auto;white-space:nowrap"><button class="ico" onclick="startCall(false)" title="Voice call">📞</button><button class="ico" onclick="startCall(true)" title="Video call">🎥</button></span></div>
    <div id="msgs"></div>
