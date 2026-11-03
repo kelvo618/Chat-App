@@ -107,6 +107,32 @@ a{color:#8fb8ff}
 #head,.top,#bar,#replybar,#emoji{background:var(--bar)}
 #call{background:radial-gradient(circle at 50% 0%,#1d2160,#05060f 70%)}
 #side,#main,#pane{min-width:0}#bar input[type=text]{min-width:0}#head>div{min-width:0}#hname{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+.tab{flex:1;background:none;border:0;padding:10px;color:var(--sub);cursor:pointer;font-weight:600}
+.tab.on{color:var(--txt);box-shadow:inset 0 -2px var(--g)}
+#sdot{display:none;width:8px;height:8px;border-radius:50%;background:var(--p);margin-left:6px;box-shadow:0 0 8px var(--p)}
+#slist{overflow:auto;flex:1}
+.shead{padding:10px 12px;color:var(--sub);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.srow{display:flex;gap:12px;align-items:center;padding:10px 12px;cursor:pointer}.srow:hover{background:var(--bar)}
+.ring{padding:2.5px;border-radius:50%;background:linear-gradient(135deg,#2f80ff,#b44dff);flex:none;box-shadow:0 0 10px #6a4cff55}
+.ring.seen{background:#3a3f66;box-shadow:none}.ring.none{background:transparent;border:2px dashed #3a3f66;padding:2px;box-shadow:none}
+.ring .av{border:2px solid var(--panel)}
+.sact{display:flex;gap:8px;padding:0 12px 10px}.sact button{flex:1}
+#sv{display:none;position:fixed;inset:0;background:#000;z-index:70;flex-direction:column;color:#fff}
+#sbars{display:flex;gap:4px;padding:calc(10px + env(safe-area-inset-top)) 10px 4px;z-index:3}
+#sbars i{flex:1;height:3px;background:#ffffff40;border-radius:2px;overflow:hidden}#sbars i b{display:block;height:100%;width:0;background:#fff}
+#shead{display:flex;gap:10px;align-items:center;padding:6px 12px;z-index:3}#shead small{display:block;color:#ffffffb0}
+#sbody{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#sbody img,#sbody video{max-width:100%;max-height:100%;object-fit:contain}
+.stext{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;font-size:26px;font-weight:700;color:#fff;word-break:break-word}
+.scap{position:absolute;bottom:90px;left:0;right:0;text-align:center;padding:12px 16px;background:linear-gradient(transparent,#000a)}
+#sprev,#snext{position:absolute;top:70px;bottom:90px;z-index:2}#sprev{left:0;width:35%}#snext{right:0;width:65%}
+#sfoot{position:absolute;bottom:0;left:0;right:0;z-index:3;padding:12px 12px calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:10px}
+#sfoot button{background:#ffffff22;border:0;border-radius:22px;font-size:22px;padding:6px 12px;color:#fff;cursor:pointer}#sfoot button.on{background:#b44dff99}
+.swatches{display:flex;gap:8px;margin:10px 0}.swatches span{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent}.swatches span.on{border-color:#fff}
+#stxt{width:100%;min-height:150px;border-radius:12px;border:0;padding:20px;font:inherit;font-size:20px;font-weight:700;color:#fff;text-align:center;resize:none}
+#stxt::placeholder{color:#ffffffaa}
+#modal{z-index:80}
 </style></head><body>
 <div id="auth">
  <img src="/icon.svg" alt="PHANTOM LINK">
@@ -125,8 +151,10 @@ a{color:#8fb8ff}
   <div class="brandbar"><img src="/icon.svg" alt=""> PHANTOM LINK</div>
   <div class="top"><div class="me"><span id="meAv" onclick="editProfile()" style="cursor:pointer"></span><div><b id="meName"></b><small id="meNum"></small></div></div>
    <div><button class="ico" title="Profile" onclick="editProfile()">⚙️</button><button class="btn" onclick="newChat()">+ Chat</button> <button class="btn alt" onclick="newGroup()">Group</button></div></div>
+  <div id="tabs"><button id="tab-chats" class="tab on" onclick="tab('chats')">Chats</button><button id="tab-status" class="tab" onclick="tab('status')">Status<i id="sdot"></i></button></div>
   <input id="q" placeholder="Search chats" oninput="renderList()">
   <div id="list"></div>
+  <div id="slist" style="display:none"></div>
  </div>
  <div id="main">
   <div id="empty"><img src="/icon.svg" alt=""><h3 class="brand">PHANTOM LINK</h3><p>Select a chat or start one with a number</p></div>
@@ -145,6 +173,10 @@ a{color:#8fb8ff}
 <div id="call"><video id="rv" autoplay playsinline></video><video id="lv" autoplay playsinline muted></video>
  <div id="cinfo"><div class="av big" id="cav"></div><h2 id="cname" style="margin:6px 0"></h2><div id="cstat"></div></div>
  <div id="cbtns"><button id="cmute" onclick="toggleMute(this)">🎙️</button><button id="ccam" onclick="toggleCam(this)">📷</button><button id="cacc" class="acc" onclick="acceptCall()">📞</button><button class="end" onclick="hangup()">📵</button></div></div>
+<input type="file" id="sfile" accept="image/*,video/*" hidden onchange="postMedia(this)">
+<div id="sv"><div id="sbars"></div>
+ <div id="shead"><div class="av" id="sav"></div><div><b id="sname"></b><small id="stime"></small></div><span style="margin-left:auto"><button class="ico" id="sdel" onclick="delStatus()">🗑</button><button class="ico" onclick="closeStatus()">✕</button></span></div>
+ <div id="sbody"></div><div id="sprev" onclick="stepStatus(-1)"></div><div id="snext" onclick="stepStatus(1)"></div><div id="sfoot"></div></div>
 <div id="modal" onclick="if(event.target===this)closeModal()"></div><div id="toast"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -390,6 +422,118 @@ function callSockets(){
   });
   sock.on('call:rejected',({from})=>{if(from===callPeer)endCall(null,'Call declined')});
   sock.on('call:ended',({from})=>{if(from===callPeer)endCall(null,callState==='ringing'?'Missed call':'Call ended')});
+}
+// ---------- 24-hour status updates ----------
+const SBG=['linear-gradient(135deg,#2f80ff,#b44dff)','linear-gradient(135deg,#ff5f6d,#ffc371)','linear-gradient(135deg,#11998e,#38ef7d)','linear-gradient(135deg,#232526,#414345)','linear-gradient(135deg,#4e54c8,#8f94fb)','linear-gradient(135deg,#ee0979,#ff6a00)'];
+const SREACT=['❤️','😂','😮','😢','👍','🙏'];
+let SDATA={mine:[],others:[]},sv={g:null,i:0,t:null,mine:false},sbgI=0;
+const ago=t=>{const m=Math.floor((Date.now()-t)/60000);return m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h ago'};
+const _start=start;
+start=function(){_start();sock.on('statuses-changed',loadStatuses);loadStatuses();setInterval(loadStatuses,300000)};
+function tab(t){
+  const st=t==='status';
+  $('#tab-chats').classList.toggle('on',!st);$('#tab-status').classList.toggle('on',st);
+  $('#q').style.display=st?'none':'';$('#list').style.display=st?'none':'';$('#slist').style.display=st?'':'none';
+  if(st)loadStatuses();
+}
+async function loadStatuses(){
+  try{SDATA=await api('statuses')}catch{return}
+  $('#sdot').style.display=SDATA.others.some(o=>o.items.some(i=>!i.viewed))?'inline-block':'none';
+  if($('#sv').style.display!=='flex')renderStatuses();
+}
+function renderStatuses(){
+  const mine=SDATA.mine,ring=(c,x)=>`<div class="ring ${c}">${x}</div>`;
+  let h=`<div class="srow" onclick="${mine.length?"openStatus('mine',0)":'composeText()'}">${ring(mine.length?'':'none',avHtml(me.name,me.avatar))}<div><b>My status</b><div class="sub">${mine.length?mine.length+' update'+(mine.length>1?'s':'')+' · '+ago(mine[mine.length-1].ts):'Tap to add a status update'}</div></div></div>
+   <div class="sact"><button class="btn alt" onclick="composeText()">✏️ Text</button><button class="btn alt" onclick="$('#sfile').click()">📷 Photo / video</button></div>
+   <div class="shead">Recent updates</div>`;
+  h+=SDATA.others.map((o,i)=>`<div class="srow" onclick="openStatus(${i},0)">${ring(o.items.some(x=>!x.viewed)?'':'seen',avHtml(o.owner.name,o.owner.avatar))}<div><b>${esc(o.owner.name)}</b><div class="sub">${ago(o.items[o.items.length-1].ts)}</div></div></div>`).join('')
+    ||'<p class="sub" style="padding:0 12px">No updates from your contacts yet. Statuses disappear after 24 hours.</p>';
+  $('#slist').innerHTML=h;
+}
+function composeText(){
+  sbgI=0;
+  openModal(`<h3 style="margin:0 0 8px">Text status</h3><textarea id="stxt" maxlength="700" placeholder="Type a status" style="background:${SBG[0]}"></textarea>
+   <div class="swatches">${SBG.map((b,i)=>`<span class="${i?'':'on'}" style="background:${b}" onclick="pickBg(${i})"></span>`).join('')}</div>
+   <div class="row"><button class="btn" onclick="postText()">Post</button><button class="btn alt" onclick="closeModal()">Cancel</button></div>`);
+}
+function pickBg(i){sbgI=i;$('#stxt').style.background=SBG[i];document.querySelectorAll('.swatches span').forEach((s,k)=>s.classList.toggle('on',k===i))}
+async function postText(){
+  const text=$('#stxt').value.trim();if(!text)return toast('Write something first');
+  try{await api('statuses',{method:'POST',body:JSON.stringify({type:'text',text,bg:sbgI})});closeModal();toast('Status posted');loadStatuses()}catch(e){toast(e.message)}
+}
+async function postMedia(inp){
+  const f=inp.files[0];inp.value='';if(!f)return;
+  const isV=f.type.startsWith('video/'),isI=f.type.startsWith('image/');
+  if(!isV&&!isI)return toast('Choose a photo or video');
+  if(isV&&f.size>15*1024*1024)return toast('Video is too large (max 15 MB)');
+  toast('Posting…');
+  try{
+    let up=f;
+    if(isI){
+      const bmp=await createImageBitmap(f),k=Math.min(1,1280/Math.max(bmp.width,bmp.height)),cv=document.createElement('canvas');
+      cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+      up=new File([await new Promise(r=>cv.toBlob(r,'image/jpeg',.82))],'status.jpg',{type:'image/jpeg'});
+    }
+    const fd=new FormData();fd.append('file',up);
+    const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw new Error('Upload failed');
+    await api('statuses',{method:'POST',body:JSON.stringify({type:isV?'video':'image',file:await r.json()})});
+    toast('Status posted');loadStatuses();
+  }catch(e){toast(e.message||'Could not post status')}
+}
+function openStatus(who,i){
+  const mineV=who==='mine',g=mineV?{owner:{number:me.number,name:'My status',avatar:me.avatar},items:SDATA.mine}:SDATA.others[who];
+  if(!g||!g.items.length)return;
+  if(!mineV){const u=g.items.findIndex(x=>!x.viewed);if(u>0)i=u}
+  sv={g,i,t:null,mine:mineV};$('#sv').style.display='flex';showStatus();
+}
+function fresh(){const it=sv.g.items[sv.i];return sv.mine?(SDATA.mine.find(x=>x.id===it.id)||it):it}
+function statusFoot(){
+  const it=fresh();
+  $('#sfoot').innerHTML=sv.mine?`<button onclick="showViewers()">👁 ${(it.views||[]).length}</button>`
+    :SREACT.map(e=>`<button class="${it.myReaction===e?'on':''}" onclick="reactStatus('${e}')">${e}</button>`).join('');
+}
+function showStatus(){
+  clearTimeout(sv.t);
+  const it=sv.g.items[sv.i],body=$('#sbody');
+  $('#sav').innerHTML=avIn(sv.g.owner.name,sv.g.owner.avatar);$('#sname').textContent=sv.g.owner.name;$('#stime').textContent=ago(it.ts);
+  $('#sdel').style.display=sv.mine?'':'none';
+  $('#sbars').innerHTML=sv.g.items.map((_,k)=>`<i><b style="width:${k<sv.i?100:0}%"></b></i>`).join('');
+  const cap=it.text&&it.type!=='text'?`<div class="scap">${esc(it.text)}</div>`:'';
+  const run=ms=>{const b=$('#sbars').children[sv.i].firstChild;b.style.transition='width '+ms+'ms linear';requestAnimationFrame(()=>requestAnimationFrame(()=>b.style.width='100%'))};
+  if(it.type==='text'){body.innerHTML=`<div class="stext" style="background:${SBG[it.bg]||SBG[0]}">${esc(it.text)}</div>`;run(6000);sv.t=setTimeout(()=>stepStatus(1),6000)}
+  else if(it.type==='image'){body.innerHTML=`<img src="${esc(it.file.url)}" alt="">${cap}`;run(5000);sv.t=setTimeout(()=>stepStatus(1),5000)}
+  else{
+    body.innerHTML=`<video src="${esc(it.file.url)}" autoplay playsinline></video>${cap}`;
+    const v=body.querySelector('video');
+    v.onloadedmetadata=()=>run(Math.max(1000,(v.duration||5)*1000));v.onended=()=>stepStatus(1);v.onerror=()=>{sv.t=setTimeout(()=>stepStatus(1),2000)};v.play().catch(()=>{});
+  }
+  statusFoot();
+  if(!sv.mine&&!it.viewed){it.viewed=true;api('statuses/'+it.id+'/view',{method:'POST'}).catch(()=>{})}
+}
+function stepStatus(d){
+  const n=sv.i+d;
+  if(n<0){showStatus();return}
+  if(n>=sv.g.items.length)return closeStatus();
+  sv.i=n;showStatus();
+}
+function closeStatus(){
+  clearTimeout(sv.t);$('#sbody').innerHTML='';$('#sv').style.display='none';
+  $('#sdot').style.display=SDATA.others.some(o=>o.items.some(i=>!i.viewed))?'inline-block':'none';
+  renderStatuses();
+}
+async function reactStatus(e){
+  const it=sv.g.items[sv.i];
+  try{const r=await api('statuses/'+it.id+'/react',{method:'POST',body:JSON.stringify({emoji:e})});it.myReaction=r.reaction;statusFoot()}catch(x){toast(x.message)}
+}
+function showViewers(){
+  clearTimeout(sv.t);const v=$('#sbody video');if(v)v.pause();
+  const list=fresh().views||[];
+  openModal(`<h3 style="margin:0 0 10px">Viewed by ${list.length}</h3>`+(list.map(x=>`<div class="srow" style="padding:6px 0;cursor:default">${avHtml(x.name,x.avatar)}<div style="flex:1"><b>${esc(x.name)}</b><div class="sub">${ago(x.ts)}</div></div><span style="font-size:22px">${x.reaction||''}</span></div>`).join('')||'<p class="sub">No views yet.</p>')+'<div class="row" style="margin-top:10px"><button class="btn alt" onclick="closeModal()">Close</button></div>');
+}
+async function delStatus(){
+  if(!confirm('Delete this status?'))return;
+  const it=sv.g.items[sv.i];
+  try{await api('statuses/'+it.id,{method:'DELETE'});closeStatus();toast('Status deleted');loadStatuses()}catch(e){toast(e.message)}
 }
 init();
 </script></body></html>

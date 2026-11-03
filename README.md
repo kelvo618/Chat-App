@@ -38,6 +38,9 @@ git remote add origin https://github.com/<your-username>/chatapp.git
 git push -u origin main
 ```
 
+## Status updates (24 hours)
+Post text, photo or video statuses from the **Status** tab. Contacts (people you share a chat or group with) can view and react to them, and you can see who viewed yours. Statuses are removed automatically after 24 hours, or earlier if you delete them.
+
 ## Profiles and calls
 - Profile page: tap your avatar (top left) to change photo, name and about. Tap a chat header to see a contact's profile.
 - Voice and video calls (WebRTC, signalled over Socket.IO) from the chat header or the contact card.

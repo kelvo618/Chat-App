@@ -42,7 +42,17 @@ if (pool) app.get('/uploads/:id', async (req, res) => {
     res.setHeader('Content-Type', SAFE.test(f.type) ? f.type : 'application/octet-stream');
     if (!SAFE.test(f.type)) res.setHeader('Content-Disposition', 'attachment');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.send(f.data);
+    const buf = f.data, rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    res.setHeader('Accept-Ranges', 'bytes');  // needed for video/audio playback and seeking on iOS Safari
+    if (rg && (rg[1] || rg[2])) {
+      let start = rg[1] ? +rg[1] : buf.length - +rg[2];
+      const end = rg[1] && rg[2] ? Math.min(+rg[2], buf.length - 1) : buf.length - 1;
+      if (start < 0) start = 0;
+      if (start > end || start >= buf.length) return res.status(416).set('Content-Range', 'bytes */' + buf.length).end();
+      res.status(206).set({ 'Content-Range': `bytes ${start}-${end}/${buf.length}`, 'Content-Length': end - start + 1 });
+      return res.end(buf.subarray(start, end + 1));
+    }
+    res.send(buf);
   } catch { res.sendStatus(500); }
 });
 else app.use('/uploads', express.static(path.join(DATA, 'uploads'), { setHeaders: (res, f) => { if (!/\.(png|jpe?g|gif|webp|webm|ogg|mp3|m4a|mp4|pdf)$/i.test(f)) res.setHeader('Content-Disposition', 'attachment'); } }));
@@ -106,6 +116,75 @@ app.get('/api/ice', auth, (req, res) => {
   const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
   if (process.env.TURN_URL) iceServers.push({ urls: process.env.TURN_URL.split(','), username: process.env.TURN_USER, credential: process.env.TURN_PASS });
   res.json({ iceServers });
+});
+
+// ---- 24-hour statuses ----
+const DAY = 24 * 60 * 60 * 1000, S_REACT = ['❤️', '😂', '😮', '😢', '👍', '🙏'];
+const sts = () => db.statuses || (db.statuses = []);
+const live = () => { const cut = Date.now() - DAY; if (sts().some(x => x.ts <= cut)) { db.statuses = sts().filter(x => x.ts > cut); save(); } return sts(); };
+setInterval(live, 60 * 60 * 1000).unref();  // purge expired statuses hourly
+const contactsOf = me => {  // people you share a private chat or a group with
+  const set = new Set();
+  db.messages.forEach(m => { if (m.chat.startsWith('dm:')) { const mem = members(m.chat); if (mem.includes(me)) mem.forEach(n => n !== me && set.add(n)); } });
+  db.groups.forEach(g => g.members.includes(me) && g.members.forEach(n => n !== me && set.add(n)));
+  return set;
+};
+const ping = nums => nums.forEach(n => io.to(n).emit('statuses-changed'));
+const ownerPub = n => { const u = userBy(n) || {}; return { number: n, name: u.name || n, avatar: u.avatar || null }; };
+const findSt = (req, res) => {
+  const st = live().find(x => x.id === req.params.id);
+  if (!st || (st.owner !== req.user.number && !contactsOf(req.user.number).has(st.owner))) { res.status(404).json({ error: 'Status not found' }); return null; }
+  return st;
+};
+app.get('/api/statuses', auth, (req, res) => {
+  const me = req.user.number, con = contactsOf(me), groups = {}, mine = [];
+  live().forEach(st => {
+    if (st.owner === me) return mine.push({ id: st.id, type: st.type, text: st.text, bg: st.bg, file: st.file, ts: st.ts,
+      views: st.views.map(v => ({ ...ownerPub(v.n), ts: v.ts, reaction: st.reactions[v.n] || null })) });
+    if (!con.has(st.owner)) return;
+    (groups[st.owner] = groups[st.owner] || []).push({ id: st.id, type: st.type, text: st.text, bg: st.bg, file: st.file, ts: st.ts,
+      viewed: st.views.some(v => v.n === me), myReaction: st.reactions[me] || null });
+  });
+  const others = Object.entries(groups).map(([n, items]) => ({ owner: ownerPub(n), items: items.sort((a, b) => a.ts - b.ts) }))
+    .sort((a, b) => b.items[b.items.length - 1].ts - a.items[a.items.length - 1].ts);
+  res.json({ mine: mine.sort((a, b) => a.ts - b.ts), others });
+});
+app.post('/api/statuses', auth, (req, res) => {
+  const { type, text, bg, file } = req.body || {};
+  if (live().filter(x => x.owner === req.user.number).length >= 30) return res.status(429).json({ error: 'Daily status limit reached' });
+  const st = { id: uid() + uid(), owner: req.user.number, type, ts: Date.now(), views: [], reactions: {} };
+  if (type === 'text') {
+    st.text = String(text || '').trim().slice(0, 700);
+    if (!st.text) return res.status(400).json({ error: 'Write something first' });
+    st.bg = Number.isInteger(bg) && bg >= 0 && bg < 6 ? bg : 0;
+  } else if (type === 'image' || type === 'video') {
+    if (!file || !/^\/uploads\/[\w.\-]+$/.test(file.url || '') || !String(file.type || '').startsWith(type + '/')) return res.status(400).json({ error: 'Invalid media' });
+    st.file = { url: file.url, name: String(file.name || '').slice(0, 80), type: file.type };
+    st.text = String(text || '').slice(0, 200);
+  } else return res.status(400).json({ error: 'Invalid status' });
+  sts().push(st); save();
+  ping([st.owner, ...contactsOf(st.owner)]);
+  res.json({ id: st.id });
+});
+app.post('/api/statuses/:id/view', auth, (req, res) => {
+  const st = findSt(req, res); if (!st) return;
+  if (st.owner !== req.user.number && !st.views.some(v => v.n === req.user.number)) { st.views.push({ n: req.user.number, ts: Date.now() }); save(); ping([st.owner]); }
+  res.json({ ok: true });
+});
+app.post('/api/statuses/:id/react', auth, (req, res) => {
+  const st = findSt(req, res); if (!st) return;
+  const me = req.user.number, e = (req.body || {}).emoji;
+  if (st.owner === me || !S_REACT.includes(e)) return res.status(400).json({ error: 'Cannot react' });
+  if (st.reactions[me] === e) delete st.reactions[me]; else st.reactions[me] = e;
+  if (!st.views.some(v => v.n === me)) st.views.push({ n: me, ts: Date.now() });
+  save(); ping([st.owner]); res.json({ reaction: st.reactions[me] || null });
+});
+app.delete('/api/statuses/:id', auth, (req, res) => {
+  const st = live().find(x => x.id === req.params.id);
+  if (!st || st.owner !== req.user.number) return res.status(404).json({ error: 'Not found' });
+  db.statuses = sts().filter(x => x !== st); save();
+  ping([st.owner, ...contactsOf(st.owner)]);
+  res.json({ ok: true });
 });
 
 // ---- chats, messages, groups ----
