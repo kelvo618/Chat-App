@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05060f">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg"><link rel="apple-touch-icon" href="/icon-192.png">
+<title>PHANTOM LINK</title>
+<style>
+:root{color-scheme:dark;--g:#2f80ff;--p:#b44dff;--bg:#070816;--me:#2358d6;--line:#1b1f3a;--panel:#0d0f22;--bar:#12142b;--txt:#eef0ff;--sub:#8b90b8;--in:#171a35}
+*{box-sizing:border-box}
+body{margin:0;font:15px system-ui,sans-serif;height:100vh;height:100dvh;background:var(--bar);color:var(--txt)}
+button,input{font:inherit;color:inherit}
+input{background:var(--in)}
+a{color:var(--g)}
+.btn{background:var(--g);color:#fff;border:0;padding:9px 13px;border-radius:8px;cursor:pointer}
+.btn.alt{background:transparent;color:var(--g);border:1px solid var(--g)}
+.ico{background:none;border:0;font-size:19px;cursor:pointer;padding:4px 6px}
+#auth{max-width:340px;margin:7vh auto;background:var(--panel);padding:24px;border-radius:12px;box-shadow:0 2px 10px #0003;text-align:center}
+#auth img{width:84px;height:84px;border-radius:20px}
+#auth input{width:100%;padding:10px;margin:6px 0;border:1px solid #8884;border-radius:8px}
+#auth .row{display:flex;gap:8px;margin-top:8px}#auth .row button{flex:1}
+#err{color:#e33;min-height:1.2em;font-size:13px}
+#app{display:none;height:100%;grid-template-columns:350px 1fr}
+#side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.top{background:var(--bar);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.top small{color:var(--sub);display:block}
+.top .me{display:flex;gap:8px;align-items:center}.top .me img{width:34px;height:34px;border-radius:8px}
+#q{margin:8px 12px;padding:8px 12px;border:0;border-radius:8px;background:var(--bar)}
+#list{overflow:auto;flex:1}
+.chat{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px;align-items:center}
+.chat:hover,.chat.on{background:var(--bar)}
+.av{width:42px;height:42px;border-radius:50%;background:#8884;display:grid;place-items:center;font-weight:600;flex:none}
+.chat .mid{flex:1;min-width:0}.chat .mid div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--sub);font-size:13px}
+.badge{background:#25d366;color:#fff;border-radius:10px;padding:1px 7px;font-size:12px}
+#main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+#empty{margin:auto;color:var(--sub);text-align:center}#empty img{width:96px;opacity:.9;border-radius:22px}
+#pane{display:none;flex-direction:column;height:100%;min-height:0}
+#head{background:var(--bar);padding:10px 12px;display:flex;gap:10px;align-items:center}
+#back{display:none}
+#msgs{flex:1;overflow:auto;padding:12px 8%;display:flex;flex-direction:column;gap:4px}
+.day{align-self:center;background:var(--panel);color:var(--sub);font-size:12px;padding:3px 10px;border-radius:8px;margin:6px 0}
+.m{position:relative;max-width:75%;padding:6px 9px;border-radius:8px;background:var(--in);align-self:flex-start;word-wrap:break-word;box-shadow:0 1px 1px #0002}
+.m.me{background:var(--me);align-self:flex-end}
+.m .who{font-size:12px;color:var(--g);font-weight:600}
+.m img.pic{max-width:100%;border-radius:6px;display:block}
+.m audio{max-width:230px;height:36px}
+.m .t{font-size:11px;color:var(--sub);text-align:right;margin-top:2px}
+.m .q{border-left:3px solid var(--g);background:#8882;border-radius:4px;padding:3px 7px;margin-bottom:4px;font-size:13px;color:var(--sub)}
+.m.del{font-style:italic;color:var(--sub)}
+.act{position:absolute;top:-13px;right:6px;display:none;background:var(--panel);border-radius:12px;box-shadow:0 1px 4px #0004;padding:0 4px;font-size:13px}
+.m:hover .act{display:block}.act span{cursor:pointer;padding:2px 4px}
+@media(hover:none){.act{display:block;opacity:.7}}
+.tick.read{color:#53bdeb}
+#replybar{display:none;background:var(--bar);padding:6px 12px;border-left:4px solid var(--g);font-size:13px;color:var(--sub);justify-content:space-between}
+#emoji{display:none;background:var(--bar);padding:6px 10px;flex-wrap:wrap;gap:2px;max-height:130px;overflow:auto}
+#emoji span{cursor:pointer;font-size:22px;padding:2px 4px}
+#bar{display:flex;gap:6px;padding:10px;background:var(--bar);align-items:center;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+#bar input[type=text]{flex:1;padding:10px 14px;border:0;border-radius:20px}
+#bar label{cursor:pointer;font-size:20px}
+@media(max-width:700px){
+ #app{grid-template-columns:minmax(0,1fr)}#main{display:none}
+ #app.open #side{display:none}#app.open #main{display:flex}
+ #back{display:block}#msgs{padding:12px}.m{max-width:88%}}
+
+.av{overflow:hidden}.av img{width:100%;height:100%;object-fit:cover}
+.av.big{width:110px;height:110px;font-size:42px;margin:0 auto 8px}
+#modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;z-index:40;padding:16px}
+#modal .card{background:var(--panel);border-radius:14px;padding:20px;width:100%;max-width:360px;max-height:90vh;overflow:auto}
+#modal input{width:100%;padding:10px;margin:4px 0 10px;border:1px solid #8884;border-radius:8px}
+#modal .row{display:flex;gap:8px}#modal .row button{flex:1}
+#toast{display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;max-width:90%;text-align:center}
+#call{position:fixed;inset:0;background:#111b21;color:#fff;display:none;flex-direction:column;align-items:center;z-index:50}
+#rv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
+#call.video #rv{opacity:1}
+#lv{display:none;position:absolute;right:12px;top:12px;width:110px;height:150px;object-fit:cover;border-radius:10px;background:#000;z-index:2;transform:scaleX(-1)}
+#call.video #lv{display:block}
+#cinfo{position:relative;z-index:2;text-align:center;margin-top:15vh;margin-bottom:auto}
+#call.video.on #cinfo{display:none}
+#cinfo .av.big{background:#8886;color:#fff}
+#cbtns{position:relative;z-index:2;display:flex;gap:18px;margin-bottom:8vh;padding-bottom:env(safe-area-inset-bottom)}
+#cbtns button{width:62px;height:62px;border-radius:50%;border:0;font-size:26px;background:#ffffff30;color:#fff;cursor:pointer}
+#cbtns .end{background:#e53935}#cbtns .acc{background:#25d366}
+
+body{background:#05060f;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.btn{background:linear-gradient(135deg,var(--g),var(--p));box-shadow:0 0 14px #2f80ff44}
+.btn.alt{background:transparent;color:#8fb8ff;border:1px solid #2f80ff88;box-shadow:none}
+a{color:#8fb8ff}
+.brand{margin:8px 0 2px;font-weight:800;letter-spacing:3px;background:linear-gradient(90deg,#4aa8ff,#b44dff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag{font-size:12px;letter-spacing:3px;color:#8fb8ff;margin-bottom:10px}
+.slogan{font-size:10px;letter-spacing:2px;color:#6d72a0;margin:6px 0 0}
+#auth{background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(135deg,var(--g),var(--p)) border-box;border:1px solid transparent;box-shadow:0 0 40px #5b3bff33}
+#auth img,#empty img{box-shadow:0 0 30px #7a4dff66}
+.brandbar{display:flex;align-items:center;gap:8px;padding:10px 12px 0;font-weight:800;letter-spacing:3px;font-size:12px;color:#cfd3ff}
+.brandbar img{width:24px;height:24px;border-radius:7px}
+.chat:hover,.chat.on{background:#171a35}
+.av{background:linear-gradient(135deg,#1d3a8a,#5b2bb3);color:#fff}
+.badge{background:linear-gradient(135deg,var(--g),var(--p))}
+#main{background:radial-gradient(circle at 15% 0%,#16164a66,transparent 55%),radial-gradient(circle at 95% 100%,#3a1a7a55,transparent 55%),var(--bg)}
+.m{box-shadow:0 1px 6px #0006}
+.m.me{background:linear-gradient(135deg,#2358d6,#7a3df0);color:#fff;box-shadow:0 0 14px #6a4cff44}
+.m.me .t,.m.me .q{color:#dfe2ff}
+.m .who{color:#c08aff}
+.m .q{border-left-color:var(--p)}
+.tick.read{color:#4de1ff}
+.day{background:#171a35;color:#9aa0d0}
+#head,.top,#bar,#replybar,#emoji{background:var(--bar)}
+#call{background:radial-gradient(circle at 50% 0%,#1d2160,#05060f 70%)}
+#side,#main,#pane{min-width:0}#bar input[type=text]{min-width:0}#head>div{min-width:0}#hname{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+.tab{flex:1;background:none;border:0;padding:10px;color:var(--sub);cursor:pointer;font-weight:600}
+.tab.on{color:var(--txt);box-shadow:inset 0 -2px var(--g)}
+#sdot{display:none;width:8px;height:8px;border-radius:50%;background:var(--p);margin-left:6px;box-shadow:0 0 8px var(--p)}
+#slist{overflow:auto;flex:1}
+.shead{padding:10px 12px;color:var(--sub);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.srow{display:flex;gap:12px;align-items:center;padding:10px 12px;cursor:pointer}.srow:hover{background:var(--bar)}
+.ring{padding:2.5px;border-radius:50%;background:linear-gradient(135deg,#2f80ff,#b44dff);flex:none;box-shadow:0 0 10px #6a4cff55}
+.ring.seen{background:#3a3f66;box-shadow:none}.ring.none{background:transparent;border:2px dashed #3a3f66;padding:2px;box-shadow:none}
+.ring .av{border:2px solid var(--panel)}
+.sact{display:flex;gap:8px;padding:0 12px 10px}.sact button{flex:1}
+#sv{display:none;position:fixed;inset:0;background:#000;z-index:70;flex-direction:column;color:#fff}
+#sbars{display:flex;gap:4px;padding:calc(10px + env(safe-area-inset-top)) 10px 4px;z-index:3}
+#sbars i{flex:1;height:3px;background:#ffffff40;border-radius:2px;overflow:hidden}#sbars i b{display:block;height:100%;width:0;background:#fff}
+#shead{display:flex;gap:10px;align-items:center;padding:6px 12px;z-index:3}#shead small{display:block;color:#ffffffb0}
+#sbody{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#sbody img,#sbody video{max-width:100%;max-height:100%;object-fit:contain}
+.stext{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;font-size:26px;font-weight:700;color:#fff;word-break:break-word}
+.scap{position:absolute;bottom:90px;left:0;right:0;text-align:center;padding:12px 16px;background:linear-gradient(transparent,#000a)}
+#sprev,#snext{position:absolute;top:70px;bottom:90px;z-index:2}#sprev{left:0;width:35%}#snext{right:0;width:65%}
+#sfoot{position:absolute;bottom:0;left:0;right:0;z-index:3;padding:12px 12px calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:10px}
+#sfoot button{background:#ffffff22;border:0;border-radius:22px;font-size:22px;padding:6px 12px;color:#fff;cursor:pointer}#sfoot button.on{background:#b44dff99}
+.swatches{display:flex;gap:8px;margin:10px 0}.swatches span{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent}.swatches span.on{border-color:#fff}
+#stxt{width:100%;min-height:150px;border-radius:12px;border:0;padding:20px;font:inherit;font-size:20px;font-weight:700;color:#fff;text-align:center;resize:none}
+#stxt::placeholder{color:#ffffffaa}
+#modal{z-index:80}
+
+:root{--b1:#2358d6;--b2:#7a3df0}
+html[data-theme=ocean]{--g:#00b4d8;--p:#4361ee;--bg:#03111c;--panel:#06192a;--bar:#0a2236;--line:#12344f;--in:#0f2c45;--b1:#0077b6;--b2:#00b4d8;--sub:#7fa6c4;--txt:#e6f4ff}
+html[data-theme=sunset]{--g:#ff7a59;--p:#ff3d81;--bg:#1a0b14;--panel:#240f1c;--bar:#2e1424;--line:#43203a;--in:#38192d;--b1:#ff5f6d;--b2:#ff3d81;--sub:#c49aae;--txt:#fff0f5}
+html[data-theme=forest]{--g:#2ecc71;--p:#14b8a6;--bg:#06120c;--panel:#0a1b13;--bar:#10261b;--line:#1b3a2a;--in:#143023;--b1:#0f9d58;--b2:#14b8a6;--sub:#86b5a0;--txt:#e9fff4}
+html[data-theme=light]{color-scheme:light;--g:#2563eb;--p:#7c3aed;--bg:#f4f6fb;--panel:#fff;--bar:#eef1f8;--line:#dfe4f0;--in:#fff;--txt:#14172b;--sub:#667085;--b1:#2563eb;--b2:#7c3aed}
+body{background:var(--bg)}
+.chat:hover,.chat.on{background:var(--bar)}
+.day{background:var(--bar);color:var(--sub)}
+.brandbar{color:var(--txt)}
+a,.btn.alt{color:var(--g)}
+.btn.alt{border-color:color-mix(in srgb,var(--g) 55%,transparent)}
+.av{background:linear-gradient(135deg,color-mix(in srgb,var(--g) 60%,#000),color-mix(in srgb,var(--p) 60%,#000))}
+.m.me{background:linear-gradient(135deg,var(--b1),var(--b2))}
+#main{background:radial-gradient(circle at 15% 0%,color-mix(in srgb,var(--g) 14%,transparent),transparent 55%),radial-gradient(circle at 95% 100%,color-mix(in srgb,var(--p) 14%,transparent),transparent 55%),var(--bg)}
+.vb{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:linear-gradient(135deg,var(--g),var(--p));color:#fff;font-size:10px;margin-left:4px;vertical-align:middle}
+.rxs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.rx{background:#ffffff14;border:1px solid var(--line);border-radius:12px;padding:1px 7px;font-size:12px;cursor:pointer}
+.rx.on{border-color:var(--g);background:color-mix(in srgb,var(--g) 25%,transparent)}
+.fwd{font-size:11px;color:var(--sub);font-style:italic}
+.tr{margin-top:4px;padding:4px 8px;border-left:3px solid var(--p);font-size:13px;opacity:.85}
+#pinbar{display:none;background:var(--bar);padding:6px 12px;font-size:13px;color:var(--sub);border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m.flash{animation:flash 1s}@keyframes flash{from{box-shadow:0 0 0 3px var(--g)}}
+#aichips{display:none;gap:6px;flex-wrap:wrap;padding:6px 10px;background:var(--bar)}
+#aichips span{background:var(--in);border:1px solid var(--g);border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer}
+.mi{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 4px;font-size:15px;cursor:pointer;color:var(--txt)}
+.rrow{display:flex;justify-content:space-around;padding:4px 0 10px}.rrow span{font-size:28px;cursor:pointer;padding:2px 6px}
+.tsw,.wsw{display:inline-grid;place-items:center;width:64px;height:64px;border-radius:12px;cursor:pointer;border:2px solid transparent;margin:3px;font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000a;background:var(--bar)}
+.tsw,.wsw{vertical-align:top}.wsw.plain{color:var(--txt);text-shadow:none;border:2px dashed var(--line)}.wsw{height:84px}.tsw.on,.wsw.on{border-color:var(--txt)}
+html[data-theme=light] .tsw:last-child{color:#14172b;text-shadow:none}
+#cdot{display:none;min-width:16px;height:16px;border-radius:8px;background:#ff4d6d;color:#fff;font-size:10px;font-style:normal;margin-left:6px;line-height:16px;padding:0 4px;box-shadow:0 0 8px #ff4d6d88}
+.miss{color:#ff6b81!important}
+.srow.unseen{background:color-mix(in srgb,#ff4d6d 12%,transparent)}
+</style></head><body>
+<div id="auth">
+ <img src="/icon.svg" alt="PHANTOM LINK">
+ <h2 class="brand">PHANTOM LINK</h2>
+ <div class="tag">CONNECT WITHOUT LIMITS.</div>
+ <input id="name" placeholder="Your name (sign up only)">
+ <input id="num" placeholder="Your number (log in only)" inputmode="numeric">
+ <input id="pw" type="password" placeholder="Password (6+ characters)">
+ <div id="err"></div>
+ <div class="row"><button class="btn" onclick="authGo('login')">Log in</button><button class="btn alt" onclick="authGo('signup')">Sign up</button></div>
+ <p class="sub">Signing up allocates you a unique number. Friends use it to message you.</p>
+ <p class="slogan">ONE NETWORK. ENDLESS CONNECTIONS.</p>
+</div>
+<div id="app">
+ <div id="side">
+  <div class="brandbar"><img src="/icon.svg" alt=""> PHANTOM LINK</div>
+  <div class="top"><div class="me"><span id="meAv" onclick="editProfile()" style="cursor:pointer"></span><div><b id="meName"></b><small id="meNum"></small></div></div>
+   <div><button class="ico" title="Settings" onclick="openSettings()">⚙️</button><button class="btn" onclick="newChat()">+ Chat</button> <button class="btn alt" onclick="newGroup()">Group</button></div></div>
+  <div id="tabs"><button id="tab-chats" class="tab on" onclick="tab('chats')">Chats</button><button id="tab-status" class="tab" onclick="tab('status')">Status<i id="sdot"></i></button><button id="tab-calls" class="tab" onclick="tab('calls')">Calls<i id="cdot"></i></button></div>
+  <input id="q" placeholder="Search chats" oninput="renderList()">
+  <div id="list"></div>
+  <div id="slist" style="display:none"></div>
+  <div id="clist" style="display:none;overflow:auto;flex:1"></div>
+ </div>
+ <div id="main">
+  <div id="empty"><img src="/icon.svg" alt=""><h3 class="brand">PHANTOM LINK</h3><p>Select a chat or start one with a number</p></div>
+  <div id="pane">
+   <div id="head"><button id="back" class="ico" onclick="closeChat()">←</button><div class="av" id="hav" onclick="showContact()" style="cursor:pointer"></div><div onclick="showContact()" style="cursor:pointer;min-width:0"><b id="hname"></b><small id="hsub" class="sub" style="display:block"></small></div><span id="calls" style="margin-left:auto;white-space:nowrap"><button class="ico" onclick="startCall(false)" title="Voice call">📞</button><button class="ico" onclick="startCall(true)" title="Video call">🎥</button></span></div>
+   <div id="pinbar" onclick="goPin()"></div><div id="msgs"></div>
+   <div id="aichips"></div><div id="replybar"><span id="replytxt"></span><span style="cursor:pointer" onclick="clearReply()">✕</span></div>
+   <div id="emoji"></div>
+   <div id="bar"><button class="ico" onclick="toggleEmoji()">😊</button>
+    <label>📎<input type="file" id="file" hidden onchange="sendFile(this)"></label>
+    <input type="text" id="txt" placeholder="Type a message" autocomplete="off">
+    <button class="ico" id="aibtn" style="display:none" title="Suggest replies (AI)" onclick="smartReplies()">✨</button><button class="ico" id="mic" onclick="mic()">🎤</button><button class="btn" onclick="send()">Send</button></div>
+  </div>
+ </div>
+</div>
+<div id="call"><video id="rv" autoplay playsinline></video><video id="lv" autoplay playsinline muted></video>
+ <div id="cinfo"><div class="av big" id="cav"></div><h2 id="cname" style="margin:6px 0"></h2><div id="cstat"></div></div>
+ <div id="cbtns"><button id="cmute" onclick="toggleMute(this)">🎙️</button><button id="ccam" onclick="toggleCam(this)">📷</button><button id="cacc" class="acc" onclick="acceptCall()">📞</button><button class="end" onclick="hangup()">📵</button></div></div>
+<input type="file" id="sfile" accept="image/*,video/*" hidden onchange="postMedia(this)">
+<div id="sv"><div id="sbars"></div>
+ <div id="shead"><div class="av" id="sav"></div><div><b id="sname"></b><small id="stime"></small></div><span style="margin-left:auto"><button class="ico" id="sdel" onclick="delStatus()">🗑</button><button class="ico" onclick="closeStatus()">✕</button></span></div>
+ <div id="sbody"></div><div id="sprev" onclick="stepStatus(-1)"></div><div id="snext" onclick="stepStatus(1)"></div><div id="sfoot"></div></div>
+<div id="modal" onclick="if(event.target===this)closeModal()"></div><div id="toast"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+let token=localStorage.t,me,chats=[],cur=null,msgs={},sock,pres={},typingTimer,replyId=null,rec,chunks=[];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async(p,o={})=>{const r=await fetch('/api/'+p,{...o,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...o.headers}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d};
+const time=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+const tick=s=>s==='read'?'<span class="tick read">✓✓</span>':s==='delivered'?'<span class="tick">✓✓</span>':'<span class="tick">✓</span>';
+const isAudio=f=>f?.type?.startsWith('audio/'),isImg=f=>f?.type?.startsWith('image/');
+const preview=m=>m.deleted?'🚫 Message deleted':m.text||(isAudio(m.file)?'🎤 Voice note':m.file?'📎 Attachment':'');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+document.addEventListener('click',()=>{if('Notification' in window&&Notification.permission==='default')Notification.requestPermission()},{once:true});
+
+async function authGo(kind){
+  try{const d=await api(kind,{method:'POST',body:JSON.stringify({name:$('#name').value,number:$('#num').value,password:$('#pw').value})});
+   token=d.token;localStorage.t=token;me=d.user;
+   if(kind==='signup')alert('Your number is '+d.user.number+'. Share it so people can message you!');
+   start();}catch(e){$('#err').textContent=e.message}
+}
+function logout(){localStorage.removeItem('t');location.reload()}
+async function init(){if(!token)return;try{me=await api('me');start()}catch{localStorage.removeItem('t')}}
+function start(){
+  $('#auth').style.display='none';$('#app').style.display='grid';showMe();
+  $('#emoji').innerHTML='😀 😂 🥹 😍 😘 😎 🤔 😅 😭 😡 👍 👎 🙏 👏 🙌 💪 🔥 ✨ 🎉 ❤️ 💔 😴 🤝 👀 🥳 😇 🤗 🙄 😬 🤯 🍕 ☕ 🎂 🚀 ✅ ❌'.split(' ').map(e=>`<span onclick="addEmoji('${e}')">${e}</span>`).join('');
+  sock=io({auth:{token}});
+  sock.on('message',m=>{
+    if(msgs[m.chat])msgs[m.chat].push(m);
+    if(cur===m.chat){renderMsgs();if(m.from!==me.number)sock.emit('read',{chat:cur})}
+    if(m.from!==me.number)notifyMsg(m);
+    loadChats();
+  });
+  sock.on('message-updated',m=>{const a=msgs[m.chat];if(a){const i=a.findIndex(x=>x.id===m.id);if(i>=0)a[i]=m}if(cur===m.chat)renderMsgs();loadChats()});
+  sock.on('status',({id,chat,status})=>{const m=(msgs[chat]||[]).find(x=>x.id===id);if(m){m.status=status;if(cur===chat)renderMsgs()}loadChats()});
+  sock.on('typing',({chat,name})=>{if(chat!==cur)return;$('#hsub').textContent=name+' is typing…';clearTimeout(typingTimer);typingTimer=setTimeout(setSub,1500)});
+  sock.on('presence',p=>{pres[p.number]=p;setSub();loadChats()});
+  sock.on('chats-changed',loadChats);callSockets();ice().catch(()=>{});
+  loadChats();
+}
+function showMe(){$('#meAv').innerHTML=avHtml(me.name,me.avatar);$('#meName').innerHTML=esc(me.name)+vb(me.verified);$('#meNum').innerHTML='+'+esc(me.number)+' · <a href="#" onclick="logout()">log out</a>'}
+function notifyMsg(m){
+  if(!('Notification' in window)||Notification.permission!=='granted'||(!document.hidden&&cur===m.chat))return;
+  new Notification(chatInfo(m.chat)?.name||'New message',{body:preview(m),icon:'/icon-192.png'});
+}
+async function loadChats(){chats=await api('chats');renderList();if(cur){setSub();const c=chatInfo(cur);if(c)$('#hav').innerHTML=avIn(c.name,c.avatar)}}
+function renderList(){
+  const q=$('#q').value.toLowerCase();
+  const shown=chats.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.number||'').includes(q));
+  $('#list').innerHTML=shown.map(c=>`<div class="chat ${c.id===cur?'on':''}" onclick="openChat('${c.id}')">
+   <div class="av">${avIn(c.name,c.avatar)}</div>
+   <div class="mid"><div><b>${esc(c.name)}</b>${vb(c.verified)}</div><div class="sub">${c.last?(c.last.from===me.number?tick(c.last.status)+' ':'')+esc(preview(c.last)):'No messages yet'}</div></div>
+   ${c.unread?`<span class="badge">${c.unread}</span>`:''}</div>`).join('')||'<p class="sub" style="padding:16px">No chats yet. Tap “+ Chat” and enter a number.</p>';
+}
+function chatInfo(id){return chats.find(c=>c.id===id)}
+function setSub(){
+  const c=chatInfo(cur);if(!c)return;
+  if(c.group){$('#hsub').textContent=c.members.map(n=>'+'+n).join(', ');return}
+  const p=pres[c.number];
+  $('#hsub').textContent=(p?p.online:c.online)?'online':p?.lastSeen?'last seen '+time(p.lastSeen):'+'+c.number;
+}
+async function openChat(id){
+  cur=id;clearReply();$('#empty').style.display='none';$('#pane').style.display='flex';$('#app').classList.add('open');
+  const c=chatInfo(id);$('#hname').innerHTML=esc(c.name)+vb(c.verified);$('#hav').innerHTML=avIn(c.name,c.avatar);$('#calls').style.display=c.group?'none':'';setSub();
+  msgs[id]=await api('messages?chat='+encodeURIComponent(id));
+  renderMsgs();sock.emit('read',{chat:id});
+  c.unread=0;renderList();$('#txt').focus();
+}
+function closeChat(){cur=null;$('#app').classList.remove('open');$('#pane').style.display='none';$('#empty').style.display='';renderList()}
+function renderMsgs(){
+  const c=chatInfo(cur),box=$('#msgs'),list=msgs[cur]||[];let last='';
+  const prev=box.scrollTop,near=box.dataset.chat!==cur||box.scrollHeight-prev-box.clientHeight<150;box.dataset.chat=cur;
+  box.innerHTML=list.map(m=>{
+    const mine=m.from===me.number,d=new Date(m.ts).toDateString();
+    const sep=d!==last?`<div class="day">${d===new Date().toDateString()?'Today':d}</div>`:'';last=d;
+    if(m.deleted)return sep+`<div class="m del ${mine?'me':''}">🚫 This message was deleted<div class="t">${time(m.ts)}</div></div>`;
+    const f=m.file?(isImg(m.file)?`<img class="pic" src="${esc(m.file.url)}">`:isAudio(m.file)?`<audio controls src="${esc(m.file.url)}"></audio>`:`<a href="${esc(m.file.url)}" target="_blank">📄 ${esc(m.file.name)}</a>`):'';
+    const r=m.replyTo&&list.find(x=>x.id===m.replyTo),tr=trCache[m.id+'|'+lang()];
+    return sep+`<div class="m ${mine?'me':''}" id="m-${m.id}"><div class="act"><span onclick="setReply('${m.id}')">↩</span><span onclick="msgMenu('${m.id}')">⋯</span></div>
+     ${m.forwarded?'<div class="fwd">↪ Forwarded</div>':''}${c?.group&&!mine?`<div class="who">+${esc(m.from)}</div>`:''}${r?`<div class="q">${esc(preview(r))}</div>`:''}${f}${m.text?`<div>${esc(m.text)}</div>`:''}${tr?`<div class="tr">🌐 ${esc(tr)}</div>`:''}
+     <div class="t">${m.pinned?'📌 ':''}${m.edited?'edited · ':''}${time(m.ts)} ${mine?tick(m.status):''}</div>${reactChips(m)}</div>`}).join('');
+  box.scrollTop=near?box.scrollHeight:prev;renderPins();
+}
+function setReply(id){const m=msgs[cur].find(x=>x.id===id);replyId=id;$('#replytxt').textContent='↩ '+preview(m).slice(0,80);$('#replybar').style.display='flex';$('#txt').focus()}
+function clearReply(){replyId=null;$('#replybar').style.display='none'}
+function del(id){if(confirm('Delete this message for everyone?'))sock.emit('delete',{id})}
+function toggleEmoji(){const e=$('#emoji');e.style.display=e.style.display==='flex'?'none':'flex'}
+function addEmoji(e){$('#txt').value+=e;$('#txt').focus()}
+function send(file){
+  const text=$('#txt').value.trim();if(!cur||(!text&&!file))return;
+  sock.emit('send',{chat:cur,text:file?'':text,file:file||null,replyTo:replyId},r=>{if(r?.error)alert(r.error)});
+  $('#txt').value='';clearReply();$('#emoji').style.display='none';
+}
+async function uploadAndSend(f){
+  const fd=new FormData();fd.append('file',f);
+  try{const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw 0;send(await r.json())}catch{alert('Upload failed')}
+}
+async function sendFile(inp){const f=inp.files[0];if(f)await uploadAndSend(f);inp.value=''}
+async function mic(){
+  if(rec&&rec.state==='recording'){rec.stop();return}
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:true});rec=new MediaRecorder(st);chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=()=>{st.getTracks().forEach(t=>t.stop());$('#mic').textContent='🎤';
+      const type=rec.mimeType||'audio/webm';uploadAndSend(new File([new Blob(chunks,{type})],'voice-note.'+(type.includes('mp4')?'m4a':'webm'),{type}))};
+    rec.start();$('#mic').textContent='⏹️';
+  }catch{alert('Microphone not available')}
+}
+$('#txt').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+$('#txt').addEventListener('input',()=>cur&&sock.emit('typing',{chat:cur}));
+async function newChat(){
+  const n=(prompt('Enter their number:')||'').replace(/\D/g,'');if(!n)return;
+  if(n===me.number)return alert('That is your own number');
+  try{const u=await api('users/'+n);const id=['dm',...[me.number,n].sort()].join(':');
+   if(!chatInfo(id))chats.unshift({id,name:u.name,number:n,online:u.online,unread:0});openChat(id)}catch(e){alert(e.message)}
+}
+async function newGroup(){
+  const name=prompt('Group name:');if(!name)return;
+  const nums=(prompt('Member numbers, comma-separated:')||'').split(',').map(s=>s.trim()).filter(Boolean);
+  try{const g=await api('groups',{method:'POST',body:JSON.stringify({name,members:nums})});await loadChats();openChat(g.id)}catch(e){alert(e.message)}
+}
+// ---------- avatars, profile, contact info ----------
+const avIn=(n,u)=>u?`<img src="${esc(u)}" alt="">`:esc((n||'?')[0].toUpperCase());
+const avHtml=(n,u,c='')=>`<div class="av ${c}">${avIn(n,u)}</div>`;
+function openModal(html){$('#modal').innerHTML=`<div class="card">${html}</div>`;$('#modal').style.display='flex'}
+function closeModal(){$('#modal').style.display='none'}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
+function editProfile(){
+  openModal(`<div style="text-align:center"><div onclick="$('#pfile').click()" style="cursor:pointer">${avHtml(me.name,me.avatar,'big')}</div>
+   <button class="btn alt" onclick="$('#pfile').click()">Change photo</button> ${me.avatar?'<button class="btn alt" onclick="setAvatar(null)">Remove</button>':''}</div>
+   <label class="sub">Name</label><input id="pname" value="${esc(me.name)}" maxlength="40">
+   <label class="sub">About</label><input id="pabout" value="${esc(me.about||'')}" maxlength="140">
+   <p class="sub">Your number: +${esc(me.number)}${me.verified?' · ✔ Verified':''}</p>
+   <div class="row"><button class="btn" onclick="saveProfile()">Save</button><button class="btn alt" onclick="closeModal()">Close</button></div>
+   <input type="file" id="pfile" accept="image/*" hidden onchange="pickAvatar(this)">`);
+}
+async function saveProfile(){
+  try{me=await api('me',{method:'PUT',body:JSON.stringify({name:$('#pname').value.trim()||me.name,about:$('#pabout').value})});showMe();closeModal()}catch(e){toast(e.message)}
+}
+async function pickAvatar(inp){
+  const f=inp.files[0];if(!f)return;
+  try{
+    const bmp=await createImageBitmap(f),S=256,cv=document.createElement('canvas');cv.width=cv.height=S;
+    const m=Math.min(bmp.width,bmp.height);
+    cv.getContext('2d').drawImage(bmp,(bmp.width-m)/2,(bmp.height-m)/2,m,m,0,0,S,S);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.85));
+    const fd=new FormData();fd.append('file',new File([blob],'avatar.jpg',{type:'image/jpeg'}));
+    const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw 0;
+    await setAvatar((await r.json()).url);
+  }catch{toast('Could not use that photo')}
+  inp.value='';
+}
+async function setAvatar(url){me=await api('me',{method:'PUT',body:JSON.stringify({avatar:url})});showMe();editProfile()}
+async function showContact(){
+  const c=chatInfo(cur);if(!c)return;
+  if(c.group)return openModal(`<div style="text-align:center">${avHtml(c.name,null,'big')}<h3 style="margin:4px 0">${esc(c.name)}</h3></div><p class="sub">${c.members.length} members</p>${c.members.map(n=>`<div>+${esc(n)}</div>`).join('')}<div class="row" style="margin-top:12px"><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+  let u={};try{u=await api('users/'+c.number)}catch{}
+  openModal(`<div style="text-align:center">${avHtml(c.name,u.avatar||c.avatar,'big')}<h3 style="margin:4px 0">${esc(c.name)}${vb(u.verified)}</h3><div class="sub">+${esc(c.number)}</div><p>${esc(u.about||'')}</p></div>
+   <div class="row"><button class="btn" onclick="closeModal();startCall(false)">📞 Voice</button><button class="btn" onclick="closeModal();startCall(true)">🎥 Video</button></div>
+   ${me.admin?`<div class="row" style="margin-top:8px"><button class="btn alt" onclick="toggleVerify('${c.number}',${!u.verified})">${u.verified?'Remove verification':'✔ Verify account'}</button></div>`:''}<div class="row" style="margin-top:8px"><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+}
+
+// ---------- voice & video calls (WebRTC; signalling over Socket.IO) ----------
+let pc,localStream,callPeer=null,callState='idle',callVideo=false,pendingIce=[],callTimer,durT,iceCfg,ringCtx,ringT;
+const ice=async()=>iceCfg||(iceCfg=(await api('ice')).iceServers);
+function ring(on){
+  clearInterval(ringT);if(!on)return;
+  const beep=()=>{try{ringCtx=ringCtx||new AudioContext();const o=ringCtx.createOscillator(),g=ringCtx.createGain();o.frequency.value=440;g.gain.value=.15;o.connect(g);g.connect(ringCtx.destination);o.start();o.stop(ringCtx.currentTime+.4)}catch{}if(navigator.vibrate)navigator.vibrate(300)};
+  beep();ringT=setInterval(beep,1500);
+}
+function ui(incoming){
+  $('#cacc').style.display=incoming?'':'none';
+  $('#cmute').style.display=incoming?'none':'';
+  $('#ccam').style.display=(!incoming&&callVideo)?'':'none';
+}
+function showCall(name,avatar,stat){
+  $('#cav').innerHTML=avIn(name,avatar);$('#cname').textContent=name;$('#cstat').textContent=stat;
+  $('#cmute').textContent='🎙️';$('#ccam').textContent='📷';
+  $('#call').classList.remove('on');$('#call').classList.toggle('video',callVideo);$('#call').style.display='flex';
+}
+const media=video=>navigator.mediaDevices.getUserMedia({audio:true,video:video?{facingMode:'user'}:false});
+async function startCall(video){
+  const c=callTarget||chatInfo(cur);if(!c||c.group||callState!=='idle')return;
+  if(!navigator.mediaDevices?.getUserMedia)return toast('Calls need a secure (https) page and a supported browser');
+  try{localStream=await media(video)}catch{return toast('Allow microphone'+(video?' and camera':'')+' access to call')}
+  callPeer=c.number;callVideo=video;callState='calling';
+  showCall(c.name,c.avatar,'Calling…');ui(false);$('#lv').srcObject=video?localStream:null;
+  sock.emit('call:invite',{to:c.number,video},r=>{if(r?.error){endCall(null,r.error)}});
+  callTimer=setTimeout(()=>{if(callState==='calling')endCall('call:end','No answer')},45000);
+}
+async function acceptCall(){
+  ring(false);
+  try{localStream=await media(callVideo)}catch{endCall('call:reject');return toast('Allow microphone'+(callVideo?' and camera':'')+' access to answer')}
+  callState='connecting';ui(false);$('#cstat').textContent='Connecting…';$('#lv').srcObject=callVideo?localStream:null;
+  sock.emit('call:accept',{to:callPeer});
+}
+const hangup=()=>endCall(callState==='ringing'?'call:reject':'call:end');
+function endCall(evt,msg){
+  clearTimeout(callTimer);clearInterval(durT);ring(false);
+  if(evt&&callPeer)sock.emit(evt,{to:callPeer});
+  try{pc&&pc.close()}catch{}pc=null;
+  localStream&&localStream.getTracks().forEach(t=>t.stop());localStream=null;
+  callPeer=null;callState='idle';pendingIce=[];
+  $('#call').style.display='none';$('#rv').srcObject=null;$('#lv').srcObject=null;
+  if(msg)toast(msg);
+}
+function toggleMute(b){const t=localStream?.getAudioTracks()[0];if(t){t.enabled=!t.enabled;b.textContent=t.enabled?'🎙️':'🔇'}}
+function toggleCam(b){const t=localStream?.getVideoTracks()[0];if(t){t.enabled=!t.enabled;b.textContent=t.enabled?'📷':'🚫'}}
+async function makePc(){
+  const p=pc=new RTCPeerConnection({iceServers:await ice()});
+  localStream.getTracks().forEach(t=>p.addTrack(t,localStream));
+  p.onicecandidate=e=>{if(e.candidate&&callPeer)sock.emit('call:signal',{to:callPeer,data:{candidate:e.candidate}})};
+  p.ontrack=e=>{$('#rv').srcObject=e.streams[0]};
+  p.onconnectionstatechange=()=>{
+    if(p!==pc)return;
+    if(p.connectionState==='connected'&&callState!=='active'){
+      callState='active';clearTimeout(callTimer);$('#call').classList.add('on');
+      const t0=Date.now();durT=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);$('#cstat').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')},1000);
+    }
+    if(p.connectionState==='failed')endCall('call:end','Call failed. Your network may be blocking direct calls.');
+  };
+}
+async function flushIce(){for(const c of pendingIce)await pc.addIceCandidate(c).catch(()=>{});pendingIce=[]}
+function callSockets(){
+  sock.on('call:incoming',({from,name,avatar,video})=>{
+    if(callState!=='idle'){sock.emit('call:reject',{to:from});return}
+    callPeer=from;callVideo=video;callState='ringing';ringInfo={name,video};
+    showCall(name,avatar,video?'Incoming video call…':'Incoming voice call…');ui(true);ring(true);
+  });
+  sock.on('call:accepted',async({from})=>{
+    if(from!==callPeer||callState!=='calling')return;
+    clearTimeout(callTimer);callState='connecting';$('#cstat').textContent='Connecting…';
+    try{await makePc();const o=await pc.createOffer();await pc.setLocalDescription(o);sock.emit('call:signal',{to:callPeer,data:{sdp:pc.localDescription}})}catch{endCall('call:end','Could not start the call')}
+  });
+  sock.on('call:signal',async({from,data})=>{
+    if(from!==callPeer)return;
+    try{
+      if(data.sdp&&data.sdp.type==='offer'){
+        await makePc();await pc.setRemoteDescription(data.sdp);await flushIce();
+        const a=await pc.createAnswer();await pc.setLocalDescription(a);
+        sock.emit('call:signal',{to:callPeer,data:{sdp:pc.localDescription}});
+      }else if(data.sdp){await pc.setRemoteDescription(data.sdp);await flushIce()}
+      else if(data.candidate){if(pc&&pc.remoteDescription)await pc.addIceCandidate(data.candidate).catch(()=>{});else pendingIce.push(data.candidate)}
+    }catch(e){console.error(e)}
+  });
+  sock.on('call:rejected',({from})=>{if(from===callPeer)endCall(null,'Call declined')});
+  sock.on('call:ended',({from})=>{
+    if(from!==callPeer)return;
+    const missed=callState==='ringing';endCall(null,missed?'Missed call':'Call ended');
+    if(missed&&'Notification' in window&&Notification.permission==='granted'&&document.hidden)new Notification('Missed '+(ringInfo.video?'video':'voice')+' call',{body:ringInfo.name+' called you',icon:'/icon-192.png'});
+  });
+}
+// ---------- 24-hour status updates ----------
+const SBG=['linear-gradient(135deg,#2f80ff,#b44dff)','linear-gradient(135deg,#ff5f6d,#ffc371)','linear-gradient(135deg,#11998e,#38ef7d)','linear-gradient(135deg,#232526,#414345)','linear-gradient(135deg,#4e54c8,#8f94fb)','linear-gradient(135deg,#ee0979,#ff6a00)'];
+const SREACT=['❤️','😂','😮','😢','👍','🙏'];
+let SDATA={mine:[],others:[]},sv={g:null,i:0,t:null,mine:false},sbgI=0;
+const ago=t=>{const m=Math.floor((Date.now()-t)/60000);return m<1?'just now':m<60?m+' min ago':Math.floor(m/60)+' h ago'};
+const _start=start;
+start=function(){_start();sock.on('statuses-changed',loadStatuses);loadStatuses();setInterval(loadStatuses,300000)};
+function tab(t){
+  const st=t==='status';
+  $('#tab-chats').classList.toggle('on',!st);$('#tab-status').classList.toggle('on',st);
+  $('#q').style.display=st?'none':'';$('#list').style.display=st?'none':'';$('#slist').style.display=st?'':'none';
+  if(st)loadStatuses();
+}
+async function loadStatuses(){
+  try{SDATA=await api('statuses')}catch{return}
+  $('#sdot').style.display=SDATA.others.some(o=>o.items.some(i=>!i.viewed))?'inline-block':'none';
+  if($('#sv').style.display!=='flex')renderStatuses();
+}
+function renderStatuses(){
+  const mine=SDATA.mine,ring=(c,x)=>`<div class="ring ${c}">${x}</div>`;
+  let h=`<div class="srow" onclick="${mine.length?"openStatus('mine',0)":'composeText()'}">${ring(mine.length?'':'none',avHtml(me.name,me.avatar))}<div><b>My status</b><div class="sub">${mine.length?mine.length+' update'+(mine.length>1?'s':'')+' · '+ago(mine[mine.length-1].ts):'Tap to add a status update'}</div></div></div>
+   <div class="sact"><button class="btn alt" onclick="composeText()">✏️ Text</button><button class="btn alt" onclick="$('#sfile').click()">📷 Photo / video</button></div>
+   <div class="shead">Recent updates</div>`;
+  h+=SDATA.others.map((o,i)=>`<div class="srow" onclick="openStatus(${i},0)">${ring(o.items.some(x=>!x.viewed)?'':'seen',avHtml(o.owner.name,o.owner.avatar))}<div><b>${esc(o.owner.name)}</b>${vb(o.owner.verified)}<div class="sub">${ago(o.items[o.items.length-1].ts)}</div></div></div>`).join('')
+    ||'<p class="sub" style="padding:0 12px">No updates from your contacts yet. Statuses disappear after 24 hours.</p>';
+  $('#slist').innerHTML=h;
+}
+function composeText(){
+  sbgI=0;
+  openModal(`<h3 style="margin:0 0 8px">Text status</h3><textarea id="stxt" maxlength="700" placeholder="Type a status" style="background:${SBG[0]}"></textarea>
+   <div class="swatches">${SBG.map((b,i)=>`<span class="${i?'':'on'}" style="background:${b}" onclick="pickBg(${i})"></span>`).join('')}</div>
+   <div class="row"><button class="btn" onclick="postText()">Post</button><button class="btn alt" onclick="closeModal()">Cancel</button></div>`);
+}
+function pickBg(i){sbgI=i;$('#stxt').style.background=SBG[i];document.querySelectorAll('.swatches span').forEach((s,k)=>s.classList.toggle('on',k===i))}
+async function postText(){
+  const text=$('#stxt').value.trim();if(!text)return toast('Write something first');
+  try{await api('statuses',{method:'POST',body:JSON.stringify({type:'text',text,bg:sbgI})});closeModal();toast('Status posted');loadStatuses()}catch(e){toast(e.message)}
+}
+async function postMedia(inp){
+  const f=inp.files[0];inp.value='';if(!f)return;
+  const isV=f.type.startsWith('video/'),isI=f.type.startsWith('image/');
+  if(!isV&&!isI)return toast('Choose a photo or video');
+  if(isV&&f.size>15*1024*1024)return toast('Video is too large (max 15 MB)');
+  toast('Posting…');
+  try{
+    let up=f;
+    if(isI){
+      const bmp=await createImageBitmap(f),k=Math.min(1,1280/Math.max(bmp.width,bmp.height)),cv=document.createElement('canvas');
+      cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+      up=new File([await new Promise(r=>cv.toBlob(r,'image/jpeg',.82))],'status.jpg',{type:'image/jpeg'});
+    }
+    const fd=new FormData();fd.append('file',up);
+    const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw new Error('Upload failed');
+    await api('statuses',{method:'POST',body:JSON.stringify({type:isV?'video':'image',file:await r.json()})});
+    toast('Status posted');loadStatuses();
+  }catch(e){toast(e.message||'Could not post status')}
+}
+function openStatus(who,i){
+  const mineV=who==='mine',g=mineV?{owner:{number:me.number,name:'My status',avatar:me.avatar},items:SDATA.mine}:SDATA.others[who];
+  if(!g||!g.items.length)return;
+  if(!mineV){const u=g.items.findIndex(x=>!x.viewed);if(u>0)i=u}
+  sv={g,i,t:null,mine:mineV};$('#sv').style.display='flex';showStatus();
+}
+function fresh(){const it=sv.g.items[sv.i];return sv.mine?(SDATA.mine.find(x=>x.id===it.id)||it):it}
+function statusFoot(){
+  const it=fresh();
+  $('#sfoot').innerHTML=sv.mine?`<button onclick="showViewers()">👁 ${(it.views||[]).length}</button>`
+    :SREACT.map(e=>`<button class="${it.myReaction===e?'on':''}" onclick="reactStatus('${e}')">${e}</button>`).join('');
+}
+function showStatus(){
+  clearTimeout(sv.t);
+  const it=sv.g.items[sv.i],body=$('#sbody');
+  $('#sav').innerHTML=avIn(sv.g.owner.name,sv.g.owner.avatar);$('#sname').innerHTML=esc(sv.g.owner.name)+vb(sv.g.owner.verified);$('#stime').textContent=ago(it.ts);
+  $('#sdel').style.display=sv.mine?'':'none';
+  $('#sbars').innerHTML=sv.g.items.map((_,k)=>`<i><b style="width:${k<sv.i?100:0}%"></b></i>`).join('');
+  const cap=it.text&&it.type!=='text'?`<div class="scap">${esc(it.text)}</div>`:'';
+  const run=ms=>{const b=$('#sbars').children[sv.i].firstChild;b.style.transition='width '+ms+'ms linear';requestAnimationFrame(()=>requestAnimationFrame(()=>b.style.width='100%'))};
+  if(it.type==='text'){body.innerHTML=`<div class="stext" style="background:${SBG[it.bg]||SBG[0]}">${esc(it.text)}</div>`;run(6000);sv.t=setTimeout(()=>stepStatus(1),6000)}
+  else if(it.type==='image'){body.innerHTML=`<img src="${esc(it.file.url)}" alt="">${cap}`;run(5000);sv.t=setTimeout(()=>stepStatus(1),5000)}
+  else{
+    body.innerHTML=`<video src="${esc(it.file.url)}" autoplay playsinline></video>${cap}`;
+    const v=body.querySelector('video');
+    v.onloadedmetadata=()=>run(Math.max(1000,(v.duration||5)*1000));v.onended=()=>stepStatus(1);v.onerror=()=>{sv.t=setTimeout(()=>stepStatus(1),2000)};v.play().catch(()=>{});
+  }
+  statusFoot();
+  if(!sv.mine&&!it.viewed){it.viewed=true;api('statuses/'+it.id+'/view',{method:'POST'}).catch(()=>{})}
+}
+function stepStatus(d){
+  const n=sv.i+d;
+  if(n<0){showStatus();return}
+  if(n>=sv.g.items.length)return closeStatus();
+  sv.i=n;showStatus();
+}
+function closeStatus(){
+  clearTimeout(sv.t);$('#sbody').innerHTML='';$('#sv').style.display='none';
+  $('#sdot').style.display=SDATA.others.some(o=>o.items.some(i=>!i.viewed))?'inline-block':'none';
+  renderStatuses();
+}
+async function reactStatus(e){
+  const it=sv.g.items[sv.i];
+  try{const r=await api('statuses/'+it.id+'/react',{method:'POST',body:JSON.stringify({emoji:e})});it.myReaction=r.reaction;statusFoot()}catch(x){toast(x.message)}
+}
+function showViewers(){
+  clearTimeout(sv.t);const v=$('#sbody video');if(v)v.pause();
+  const list=fresh().views||[];
+  openModal(`<h3 style="margin:0 0 10px">Viewed by ${list.length}</h3>`+(list.map(x=>`<div class="srow" style="padding:6px 0;cursor:default">${avHtml(x.name,x.avatar)}<div style="flex:1"><b>${esc(x.name)}</b><div class="sub">${ago(x.ts)}</div></div><span style="font-size:22px">${x.reaction||''}</span></div>`).join('')||'<p class="sub">No views yet.</p>')+'<div class="row" style="margin-top:10px"><button class="btn alt" onclick="closeModal()">Close</button></div>');
+}
+async function delStatus(){
+  if(!confirm('Delete this status?'))return;
+  const it=sv.g.items[sv.i];
+  try{await api('statuses/'+it.id,{method:'DELETE'});closeStatus();toast('Status deleted');loadStatuses()}catch(e){toast(e.message)}
+}
+// ---------- QR code generator (byte mode, error correction M, versions 1-10) ----------
+//QR-START
+const QEXP=new Array(512),QLOG=new Array(256);
+(()=>{let x=1;for(let i=0;i<255;i++){QEXP[i]=x;QLOG[x]=i;x<<=1;if(x&256)x^=0x11d}for(let i=255;i<512;i++)QEXP[i]=QEXP[i-255]})();
+const qmul=(a,b)=>a&&b?QEXP[QLOG[a]+QLOG[b]]:0;
+function qrs(d,n){let g=[1];for(let i=0;i<n;i++){const ng=new Array(g.length+1).fill(0);for(let j=0;j<g.length;j++){ng[j]^=g[j];ng[j+1]^=qmul(g[j],QEXP[i])}g=ng}
+  const r=new Array(n).fill(0);for(const b of d){const f=b^r[0];r.shift();r.push(0);for(let i=0;i<n;i++)r[i]^=qmul(g[i+1],f)}return r}
+function qrPenalty(c){
+  const n=c.length;let s=0,dark=0;
+  for(let t=0;t<2;t++)for(let i=0;i<n;i++){let run=1;for(let j=1;j<=n;j++){const a=j<n?(t?c[j][i]:c[i][j]):-1,p=t?c[j-1][i]:c[i][j-1];if(a===p)run++;else{if(run>=5)s+=run-2;run=1}}}
+  for(let y=0;y<n-1;y++)for(let x=0;x<n-1;x++)if(c[y][x]===c[y][x+1]&&c[y][x]===c[y+1][x]&&c[y][x]===c[y+1][x+1])s+=3;
+  const A='10111010000',B='00001011101';
+  for(let i=0;i<n;i++){let r='',q='';for(let j=0;j<n;j++){r+=c[i][j];q+=c[j][i];dark+=c[i][j]}
+    for(let j=0;j+11<=n;j++){const a=r.substr(j,11),b=q.substr(j,11);if(a===A||a===B)s+=40;if(b===A||b===B)s+=40}}
+  return s+Math.floor(Math.abs(dark*20-n*n*10)/(n*n))*10;
+}
+function qrMatrix(text){
+  const bytes=Array.from(new TextEncoder().encode(text));
+  const DATA=[16,28,44,64,86,108,124,154,182,216],ECC=[10,16,26,18,24,16,18,22,22,26];
+  const BL=[[[1,16]],[[1,28]],[[1,44]],[[2,32]],[[2,43]],[[4,27]],[[4,31]],[[2,38],[2,39]],[[3,36],[2,37]],[[4,43],[1,44]]];
+  const AL=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+  let v=0;for(let i=1;i<=10;i++)if(4+(i<10?8:16)+8*bytes.length<=DATA[i-1]*8){v=i;break}
+  if(!v)throw new Error('QR text too long');
+  const bits=[],put=(val,len)=>{for(let i=len-1;i>=0;i--)bits.push((val>>i)&1)};
+  put(4,4);put(bytes.length,v<10?8:16);bytes.forEach(b=>put(b,8));
+  put(0,Math.min(4,DATA[v-1]*8-bits.length));while(bits.length%8)bits.push(0);
+  const cw=[];for(let i=0;i<bits.length;i+=8)cw.push(parseInt(bits.slice(i,i+8).join(''),2));
+  for(let p=0xec;cw.length<DATA[v-1];p^=0xfd)cw.push(p);
+  const blocks=[];let o=0;for(const [cnt,len] of BL[v-1])for(let k=0;k<cnt;k++){blocks.push(cw.slice(o,o+len));o+=len}
+  const ecs=blocks.map(b=>qrs(b,ECC[v-1])),out=[],mx=Math.max(...blocks.map(b=>b.length));
+  for(let i=0;i<mx;i++)for(const b of blocks)if(i<b.length)out.push(b[i]);
+  for(let i=0;i<ECC[v-1];i++)for(const e of ecs)out.push(e[i]);
+  const n=17+4*v,m=Array.from({length:n},()=>new Array(n).fill(0)),f=Array.from({length:n},()=>new Array(n).fill(false));
+  const set=(x,y,val)=>{m[y][x]=val?1:0;f[y][x]=true};
+  const finder=(cx,cy)=>{for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const x=cx+dx,y=cy+dy;if(x<0||y<0||x>=n||y>=n)continue;const d=Math.max(Math.abs(dx),Math.abs(dy));set(x,y,d!==2&&d!==4)}};
+  finder(3,3);finder(n-4,3);finder(3,n-4);
+  for(let i=8;i<n-8;i++){set(i,6,i%2===0);set(6,i,i%2===0)}
+  const al=AL[v-1];
+  for(let i=0;i<al.length;i++)for(let j=0;j<al.length;j++){
+    if((i===0&&j===0)||(i===0&&j===al.length-1)||(i===al.length-1&&j===0))continue;
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(al[i]+dx,al[j]+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1);
+  }
+  const rsv=(x,y)=>{if(!f[y][x]){f[y][x]=true;m[y][x]=0}};
+  for(let i=0;i<9;i++){rsv(8,i);rsv(i,8)}
+  for(let i=0;i<8;i++){rsv(n-1-i,8);rsv(8,n-1-i)}
+  if(v>=7)for(let i=0;i<6;i++)for(let j=0;j<3;j++){rsv(n-11+j,i);rsv(i,n-11+j)}
+  set(8,n-8,true);
+  const total=out.length*8;let bi=0,up=true;
+  for(let x=n-1;x>0;x-=2){if(x===6)x--;for(let k=0;k<n;k++){const y=up?n-1-k:k;for(let dx=0;dx<2;dx++){const xx=x-dx;if(!f[y][xx]){m[y][xx]=bi<total?(out[bi>>3]>>(7-(bi&7)))&1:0;bi++}}}up=!up}
+  const cond=[(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(y/2)+Math.floor(x/3))%2===0,(x,y)=>(x*y)%2+(x*y)%3===0,(x,y)=>((x*y)%2+(x*y)%3)%2===0,(x,y)=>((x+y)%2+(x*y)%3)%2===0];
+  let best=null,bs=1e9;
+  for(let mk=0;mk<8;mk++){
+    const c=m.map(r=>r.slice());
+    for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(!f[y][x]&&cond[mk](x,y))c[y][x]^=1;
+    let rem=mk;for(let i=0;i<10;i++)rem=(rem<<1)^((rem>>>9)*0x537);
+    const fb=((mk<<10)|rem)^0x5412,bit=i=>(fb>>i)&1;  // error-correction level M has indicator 00
+    for(let i=0;i<=5;i++)c[i][8]=bit(i);c[7][8]=bit(6);c[8][8]=bit(7);c[8][7]=bit(8);
+    for(let i=9;i<15;i++)c[8][14-i]=bit(i);
+    for(let i=0;i<8;i++)c[8][n-1-i]=bit(i);
+    for(let i=8;i<15;i++)c[n-15+i][8]=bit(i);
+    c[n-8][8]=1;
+    if(v>=7){let r2=v;for(let i=0;i<12;i++)r2=(r2<<1)^((r2>>>11)*0x1f25);const vb=(v<<12)|r2;
+      for(let i=0;i<18;i++){const col=(vb>>i)&1,a=n-11+i%3,b=Math.floor(i/3);c[b][a]=col;c[a][b]=col}}
+    const s=qrPenalty(c);if(s<bs){bs=s;best=c}
+  }
+  return best;
+}
+function qrSvg(text,px=240){
+  const c=qrMatrix(text),n=c.length,q=4;let d='';
+  c.forEach((r,y)=>{let x=0;while(x<n){if(r[x]){let e=x;while(e<n&&r[e])e++;d+=`M${x+q} ${y+q}h${e-x}v1h-${e-x}z`;x=e}else x++}});
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n+2*q} ${n+2*q}" width="${px}" height="${px}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+//QR-END
+
+// ---------- themes, wallpapers, settings ----------
+const THEME_LIST=[['phantom','Phantom','linear-gradient(135deg,#2f80ff,#b44dff)'],['ocean','Ocean','linear-gradient(135deg,#0077b6,#00b4d8)'],['sunset','Sunset','linear-gradient(135deg,#ff5f6d,#ff3d81)'],['forest','Forest','linear-gradient(135deg,#0f9d58,#14b8a6)'],['light','Light','linear-gradient(135deg,#ffffff,#c7d2fe)']];
+const WALLS={aurora:'radial-gradient(circle at 20% 20%,#2f80ff55,transparent 45%),radial-gradient(circle at 80% 70%,#b44dff55,transparent 45%),#070816',dusk:'linear-gradient(160deg,#1a1038,#4a1d5c 55%,#a8416b)',ocean:'linear-gradient(170deg,#031d33,#05476b 60%,#0a7a8f)',forest:'linear-gradient(160deg,#04140c,#0b3d2a 60%,#1c6b4a)',doodle:'radial-gradient(#ffffff18 1.5px,transparent 1.5px) 0 0/22px 22px,#0b0d1f'};
+const LANGS=['English','French','Spanish','Portuguese','German','Italian','Arabic','Hindi','Chinese','Japanese','Russian','Swahili','Yoruba','Igbo','Hausa','Nigerian Pidgin'];
+document.documentElement.dataset.theme=localStorage.theme||'phantom';
+const vb=v=>v?'<span class="vb" title="Verified account">✔</span>':'';
+const lang=()=>(me&&me.settings&&me.settings.lang)||'English';
+function applyAppearance(){
+  const s=(me&&me.settings)||{},t=s.theme||'phantom',w=s.wallpaper;
+  localStorage.theme=t;document.documentElement.dataset.theme=t;
+  $('#msgs').style.background=!w?'':w.kind==='custom'?`linear-gradient(#0008,#0008),url("${w.url}") center/cover`:(WALLS[w.id]||'');
+}
+async function saveSettings(patch){
+  try{me=await api('me',{method:'PUT',body:JSON.stringify({settings:patch})});applyAppearance();return true}catch(e){toast(e.message);return false}
+}
+function openSettings(){
+  const b=(l,fn)=>`<button class="mi" onclick="${fn}">${l}</button>`;
+  openModal('<h3 style="margin:0 0 6px">Settings</h3>'+b('👤 Edit profile','editProfile()')+b('🎨 Themes &amp; chat wallpaper','openAppearance()')+b('📱 My QR code','myQR()')+b('📷 Scan a QR code','scanQR()')+b('🌐 Translation language ('+esc(lang())+')','openLang()')+(me.admin?b('✔ Verify an account','adminVerify()'):'')+b('🚪 Log out','logout()'));
+}
+function openAppearance(){
+  const s=me.settings||{},t=s.theme||'phantom',w=s.wallpaper;
+  openModal(`<h3 style="margin:0 0 8px">Theme</h3><div>${THEME_LIST.map(([id,n,g])=>`<div class="tsw ${t===id?'on':''}" style="background:${g}" onclick="setTheme('${id}')">${n}</div>`).join('')}</div>
+   <h3 style="margin:12px 0 8px">Chat wallpaper</h3><div><div class="wsw plain ${!w?'on':''}" onclick="setWall(null)">Default</div>
+   ${Object.keys(WALLS).map(id=>`<div class="wsw ${w&&w.kind==='preset'&&w.id===id?'on':''}" style="background:${WALLS[id]}" onclick="setWall('${id}')"></div>`).join('')}
+   <div class="wsw plain ${w&&w.kind==='custom'?'on':''}" onclick="$('#wfile').click()">📷 Photo</div></div>
+   <input type="file" id="wfile" accept="image/*" hidden onchange="pickWall(this)">
+   <div class="row" style="margin-top:12px"><button class="btn alt" onclick="openSettings()">Back</button><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+}
+async function setTheme(id){if(await saveSettings({theme:id}))openAppearance()}
+async function setWall(id){if(await saveSettings({wallpaper:id?{kind:'preset',id}:null}))openAppearance()}
+async function pickWall(inp){
+  const f=inp.files[0];inp.value='';if(!f)return;
+  try{
+    const bmp=await createImageBitmap(f),k=Math.min(1,1280/Math.max(bmp.width,bmp.height)),cv=document.createElement('canvas');
+    cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+    const fd=new FormData();fd.append('file',new File([await new Promise(r=>cv.toBlob(r,'image/jpeg',.8))],'wallpaper.jpg',{type:'image/jpeg'}));
+    const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});if(!r.ok)throw 0;
+    if(await saveSettings({wallpaper:{kind:'custom',url:(await r.json()).url}}))openAppearance();
+  }catch{toast('Could not use that photo')}
+}
+function openLang(){openModal('<h3 style="margin:0 0 6px">Translate messages into</h3>'+LANGS.map(l=>`<button class="mi" onclick="setLang('${l}')">${l===lang()?'✔ ':''}${l}</button>`).join('')+'<div class="row" style="margin-top:10px"><button class="btn alt" onclick="openSettings()">Back</button></div>')}
+async function setLang(l){if(await saveSettings({lang:l}))openLang()}
+
+// ---------- verified accounts (admin) ----------
+async function adminVerify(){
+  const n=(prompt('Number to verify or unverify:')||'').replace(/\D/g,'');if(!n)return;
+  try{const u=await api('users/'+n);if(confirm((u.verified?'Remove verification from ':'Verify ')+u.name+' (+'+n+')?'))await toggleVerify(n,!u.verified)}catch(e){toast(e.message)}
+}
+async function toggleVerify(n,v){
+  try{await api('admin/verify',{method:'POST',body:JSON.stringify({number:n,verified:v})});toast(v?'Account verified':'Verification removed');closeModal();me=await api('me');showMe();loadChats();loadStatuses()}catch(e){toast(e.message)}
+}
+
+// ---------- QR code: share & scan ----------
+let scanStream=null,scanT=null;
+const myLink=()=>location.origin+'/?add='+me.number;
+function myQR(){
+  let svg='';try{svg=qrSvg(myLink(),230)}catch{}
+  openModal(`<div style="text-align:center">${avHtml(me.name,me.avatar,'big')}<h3 style="margin:4px 0">${esc(me.name)}${vb(me.verified)}</h3><div class="sub">+${esc(me.number)}</div>
+   <div style="background:#fff;border-radius:12px;padding:6px;display:inline-block;margin:12px 0">${svg}</div><p class="sub">Scan with any phone camera to start a chat with me on PHANTOM LINK.</p></div>
+   <div class="row"><button class="btn" onclick="shareMe()">Share link</button><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+}
+async function shareMe(){try{if(navigator.share)await navigator.share({title:'PHANTOM LINK',text:'Message me on PHANTOM LINK',url:myLink()});else{await navigator.clipboard.writeText(myLink());toast('Link copied')}}catch{}}
+function parseAdd(s){try{const a=new URL(s).searchParams.get('add');if(a&&/^\d{6,15}$/.test(a))return a}catch{}return /^\d{6,15}$/.test(s)?s:null}
+async function startChatWith(n){
+  n=String(n).replace(/\D/g,'');if(!n||n===me.number)return;
+  try{const u=await api('users/'+n),id=['dm',...[me.number,n].sort()].join(':');
+   if(!chatInfo(id))chats.unshift({id,name:u.name,number:n,avatar:u.avatar,verified:u.verified,online:u.online,unread:0});tab('chats');openChat(id)}catch(e){toast(e.message)}
+}
+function stopCam(){clearInterval(scanT);scanT=null;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}}
+function closeModal(){$('#modal').style.display='none';stopCam()}
+async function scanQR(){
+  if(!('BarcodeDetector' in window))return openModal('<h3 style="margin:0 0 8px">Scan a QR code</h3><p>Your browser cannot scan inside the app. Open your phone&#39;s <b>Camera</b> and point it at a PHANTOM LINK QR code. Tapping the link opens the app and starts the chat.</p><div class="row"><button class="btn alt" onclick="closeModal()">Close</button></div>');
+  try{scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})}catch{return toast('Camera access is needed to scan')}
+  openModal('<video id="qv" autoplay playsinline muted style="width:100%;border-radius:12px"></video><p class="sub">Point at a PHANTOM LINK QR code</p><button class="btn alt" onclick="closeModal()">Cancel</button>');
+  const v=$('#qv'),det=new BarcodeDetector({formats:['qr_code']});v.srcObject=scanStream;
+  scanT=setInterval(async()=>{try{const r=await det.detect(v),n=r[0]&&parseAdd(r[0].rawValue);if(n){closeModal();startChatWith(n)}}catch{}},300);
+}
+
+// ---------- message tools: reactions, edit, forward, pin, copy, translate, AI replies ----------
+const MREACT=['👍','❤️','😂','😮','😢','🙏'],trCache={};let aiOn=false,pinIdx=0;
+function reactChips(m){
+  const g={};Object.entries(m.reactions||{}).forEach(([n,e])=>(g[e]=g[e]||[]).push(n));
+  const keys=Object.keys(g);if(!keys.length)return '';
+  return '<div class="rxs">'+keys.map(e=>`<span class="rx ${g[e].includes(me.number)?'on':''}" onclick="reactMsg('${m.id}','${e}')">${e}${g[e].length>1?' '+g[e].length:''}</span>`).join('')+'</div>';
+}
+const reactMsg=(id,emoji)=>sock.emit('react',{id,emoji});
+const pinMsg=(id,pin)=>sock.emit('pin',{id,pin});
+function msgMenu(id){
+  const m=msgs[cur].find(x=>x.id===id);if(!m)return;const mine=m.from===me.number;
+  const b=(l,fn)=>`<button class="mi" onclick="closeModal();${fn}">${l}</button>`;
+  openModal(`<div class="rrow">${MREACT.map(e=>`<span onclick="closeModal();reactMsg('${id}','${e}')">${e}</span>`).join('')}</div>`
+   +b('↩ Reply',`setReply('${id}')`)+(m.text?b('📋 Copy',`copyMsg('${id}')`):'')+b('↪ Forward',`fwdMsg('${id}')`)
+   +b(m.pinned?'📌 Unpin':'📌 Pin',`pinMsg('${id}',${!m.pinned})`)+(m.text&&aiOn?b(trCache[id+'|'+lang()]?'🌐 Hide translation':'🌐 Translate to '+esc(lang()),`translateMsg('${id}')`):'')
+   +(mine&&m.text&&!m.file?b('✏️ Edit',`editMsg('${id}')`):'')+(mine?b('🗑 Delete for everyone',`del('${id}')`):''));
+}
+function copyMsg(id){
+  const t=(msgs[cur].find(x=>x.id===id)||{}).text||'';
+  const fb=()=>{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('Copied')}catch{toast('Could not copy')}a.remove()};
+  navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t).then(()=>toast('Copied'),fb):fb();
+}
+function editMsg(id){
+  const m=msgs[cur].find(x=>x.id===id);
+  openModal(`<h3 style="margin:0 0 8px">Edit message</h3><textarea id="etxt" maxlength="4000" style="width:100%;min-height:90px;border-radius:10px;border:1px solid #8884;background:var(--in);color:var(--txt);padding:10px;font:inherit">${esc(m.text)}</textarea><div class="row" style="margin-top:10px"><button class="btn" onclick="saveEdit('${id}')">Save</button><button class="btn alt" onclick="closeModal()">Cancel</button></div>`);
+}
+function saveEdit(id){const text=$('#etxt').value.trim();if(!text)return toast('Message cannot be empty');sock.emit('edit',{id,text},r=>{if(r&&r.error)toast(r.error)});closeModal()}
+function fwdMsg(id){
+  openModal(`<h3 style="margin:0 0 8px">Forward to…</h3><div style="max-height:50vh;overflow:auto">${chats.map(c=>`<label class="srow" style="cursor:pointer"><input type="checkbox" class="fw" value="${esc(c.id)}" style="width:auto;margin:0">${avHtml(c.name,c.avatar)}<b>${esc(c.name)}</b></label>`).join('')||'<p class="sub">No chats yet.</p>'}</div>
+   <div class="row" style="margin-top:10px"><button class="btn" onclick="doFwd('${id}')">Send</button><button class="btn alt" onclick="closeModal()">Cancel</button></div>`);
+}
+function doFwd(id){
+  const m=msgs[cur].find(x=>x.id===id),ids=[...document.querySelectorAll('.fw:checked')].map(x=>x.value).slice(0,5);
+  if(!ids.length)return toast('Pick at least one chat');
+  ids.forEach(c=>sock.emit('send',{chat:c,text:m.text,file:m.file,forwarded:true}));closeModal();toast('Forwarded');
+}
+const pinsOf=()=>(msgs[cur]||[]).filter(m=>m.pinned&&!m.deleted).sort((a,b)=>b.pinned-a.pinned);
+function renderPins(){
+  const p=pinsOf(),bar=$('#pinbar');if(!p.length){bar.style.display='none';return}
+  pinIdx%=p.length;bar.style.display='block';bar.textContent='📌 '+(p.length>1?`${pinIdx+1}/${p.length} · `:'')+preview(p[pinIdx]);
+}
+function goPin(){
+  const p=pinsOf();if(!p.length)return;const el=document.getElementById('m-'+p[pinIdx%p.length].id);
+  if(el){el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),1000)}
+  pinIdx=(pinIdx+1)%p.length;renderPins();
+}
+function aiConsent(){
+  if(localStorage.aiok==='1')return true;
+  if(confirm('AI features send the text of a message (or the last few messages) to an AI service (Anthropic) only when you tap them. Continue?')){localStorage.aiok='1';return true}
+  return false;
+}
+async function translateMsg(id){
+  const k=id+'|'+lang();if(trCache[k]){delete trCache[k];return renderMsgs()}
+  if(!aiConsent())return;toast('Translating…');
+  try{trCache[k]=(await api('ai/translate',{method:'POST',body:JSON.stringify({id,lang:lang()})})).text;renderMsgs()}catch(e){toast(e.message)}
+}
+async function smartReplies(){
+  if(!cur||!aiConsent())return;const box=$('#aichips');box.style.display='flex';box.innerHTML='<span>Thinking…</span>';
+  try{const r=await api('ai/suggest',{method:'POST',body:JSON.stringify({chat:cur})});
+   box.innerHTML=r.replies.length?r.replies.map(t=>`<span onclick="useReply(this.textContent)">${esc(t)}</span>`).join(''):'<span>No suggestions yet</span>'}catch(e){box.style.display='none';toast(e.message)}
+}
+function useReply(t){$('#txt').value=t;$('#aichips').style.display='none';$('#txt').focus()}
+const _openChat=openChat;
+openChat=async function(id){$('#aichips').style.display='none';return _openChat(id)};
+
+// ---------- start-up hooks ----------
+const _add=new URLSearchParams(location.search).get('add');if(_add)localStorage.pendingAdd=_add.replace(/\D/g,'');
+const _start3=start;
+start=function(){
+  _start3();applyAppearance();
+  api('ai/status').then(r=>{aiOn=r.enabled;$('#aibtn').style.display=aiOn?'':'none'}).catch(()=>{});
+  const p=localStorage.pendingAdd;
+  if(p){localStorage.removeItem('pendingAdd');history.replaceState(null,'',location.pathname);setTimeout(()=>startChatWith(p),700)}
+};
+// ---------- call history ----------
+let CALLS=[],missedN=0,callTarget=null,ringInfo={name:'',video:false};
+const fmtDur=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function callTime(t){
+  const d=new Date(t),hm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return d.toDateString()===new Date().toDateString()?hm:d.toDateString()===new Date(Date.now()-864e5).toDateString()?'Yesterday '+hm:d.toLocaleDateString([],{day:'numeric',month:'short'})+' '+hm;
+}
+function callLabel(c){
+  if(c.status==='completed')return (c.dir==='in'?'Incoming':'Outgoing')+' · '+fmtDur(c.duration);
+  if(c.status==='declined')return c.dir==='in'?'You declined':'Declined';
+  if(c.dir==='in')return 'Missed';
+  return c.reason==='busy'?'Busy':c.reason==='offline'?'Not reachable':'No answer';
+}
+function updateCdot(){const d=$('#cdot');d.style.display=missedN?'inline-block':'none';d.textContent=missedN}
+async function loadCalls(markSeen){
+  try{const r=await api('calls');CALLS=r.calls;missedN=r.missed}catch{return}
+  renderCalls();updateCdot();
+  if(markSeen&&missedN){api('calls/seen',{method:'POST'}).catch(()=>{});missedN=0;updateCdot()}
+}
+function renderCalls(){
+  const rows=CALLS.map(c=>{
+    const miss=c.status==='missed'&&c.dir==='in';
+    return `<div class="srow ${c.unseen?'unseen':''}" onclick="callNumber('${esc(c.peer.number)}',${c.video})">${avHtml(c.peer.name,c.peer.avatar)}
+     <div style="flex:1;min-width:0"><b>${esc(c.peer.name)}</b>${vb(c.peer.verified)}<div class="sub ${miss?'miss':''}">${c.dir==='in'?'↙':'↗'} ${callLabel(c)} · ${callTime(c.ts)}</div></div>
+     <span style="font-size:20px" title="Call back">${c.video?'🎥':'📞'}</span></div>`}).join('');
+  $('#clist').innerHTML='<div class="shead" style="display:flex;justify-content:space-between;align-items:center"><span>Recent calls</span>'+(CALLS.length?'<a href="#" style="text-transform:none;letter-spacing:0" onclick="clearCalls();return false">Clear all</a>':'')+'</div>'
+    +(rows||'<p class="sub" style="padding:0 12px">No calls yet. Tap 📞 or 🎥 in a chat to start one.</p>');
+}
+async function clearCalls(){
+  if(!confirm('Clear your call history?'))return;
+  try{await api('calls/clear',{method:'POST'});CALLS=[];missedN=0;updateCdot();renderCalls()}catch(e){toast(e.message)}
+}
+async function callNumber(n,video){
+  if(callState!=='idle')return toast('You are already in a call');
+  try{const u=await api('users/'+n);callTarget={number:n,name:u.name,avatar:u.avatar,group:false};startCall(video);callTarget=null}catch(e){callTarget=null;toast(e.message)}
+}
+function tab(t){
+  const on={chats:t==='chats',status:t==='status',calls:t==='calls'};
+  for(const k in on)$('#tab-'+k).classList.toggle('on',on[k]);
+  $('#q').style.display=on.chats?'':'none';$('#list').style.display=on.chats?'':'none';
+  $('#slist').style.display=on.status?'':'none';$('#clist').style.display=on.calls?'':'none';
+  if(on.status)loadStatuses();if(on.calls)loadCalls(true);
+}
+const _start4=start;
+start=function(){_start4();sock.on('calls-changed',()=>loadCalls($('#tab-calls').classList.contains('on')));loadCalls(false)};
+init();
+</script></body></html>
