@@ -38,6 +38,16 @@ git remote add origin https://github.com/<your-username>/chatapp.git
 git push -u origin main
 ```
 
+## Call history
+The **Calls** tab lists incoming, outgoing, missed, declined and unanswered calls with the contact, time and duration. Tap a row to call that person back (voice or video as before). A red badge counts missed calls you have not seen, and a browser notification appears for a missed call while the tab is in the background. "Clear all" removes the list for you only. Calls are recorded by the server when they ring, connect or end.
+
+## Themes, QR, verification, AI and message tools
+- **Themes and wallpapers:** Settings (gear) > Themes & chat wallpaper. Five themes, preset wallpapers or your own photo. Saved to your account.
+- **QR code:** Settings > My QR code shows a code that opens PHANTOM LINK and starts a chat with you. Settings > Scan a QR code scans in supported browsers (Chrome on Android); on iPhone use the Camera app.
+- **Verified accounts:** set `ADMIN_NUMBERS` (comma-separated app numbers). Admins can verify or unverify accounts from Settings > Verify an account, or from a contact's profile card. Verified users show a check badge.
+- **Message tools:** tap the dots on a message for reactions, reply, copy, forward (up to 5 chats), pin (up to 3 per chat), edit (within 15 minutes) and delete for everyone.
+- **AI replies and translation (optional):** set `ANTHROPIC_API_KEY` (and optionally `AI_MODEL`, default `claude-haiku-5-5`). Message text is sent to the AI service only when a user taps Translate or the sparkles button, after a one-time confirmation. Limited to 40 AI requests per user per hour. API usage is billed by the AI provider. Without the key, the AI buttons stay hidden.
+
 ## Status updates (24 hours)
 Post text, photo or video statuses from the **Status** tab. Contacts (people you share a chat or group with) can view and react to them, and you can see who viewed yours. Statuses are removed automatically after 24 hours, or earlier if you delete them.
 
