@@ -38,6 +38,23 @@ git remote add origin https://github.com/<your-username>/chatapp.git
 git push -u origin main
 ```
 
+## Install as an app (no browser bar)
+- **Android (Chrome):** tap **Install** in the in-app banner, or Settings > Install as an app, or browser menu > Install app. It opens full screen from its own icon.
+- **iPhone:** open in Safari, tap Share > Add to Home Screen.
+- **Real Android app file (APK) / Play Store:** use https://www.pwabuilder.com with your site address, choose Package for stores > Android, and generate. Install the `.apk` on phones, or upload the `.aab` to Google Play (one-time developer fee). Put the generated `assetlinks.json` in the project root (next to `server.js`). The server publishes it at `/.well-known/assetlinks.json`, which removes the address bar inside the app. Keep the signing key from the download safe: you need it for every update.
+
+## Push notifications (messages, calls and missed calls when the app is closed)
+Uses the standard Web Push protocol, so no third-party account is needed. Set these on the server:
+- `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`: a key pair for your server. Generate your own with `npx web-push generate-vapid-keys`.
+- `VAPID_SUBJECT`: your site address (for example `https://your-app.onrender.com`) or a `mailto:` address.
+
+Then each user turns it on in Settings > Notifications (or from the banner). Notes:
+- The site must be served over HTTPS (Render does this).
+- Chrome, Edge, Firefox and Samsung Internet on Android and desktop work in the browser. On iPhone (iOS 16.4 or later) the app must first be added to the Home Screen.
+- Notification text is end-to-end encrypted between the server and the device, but it still passes through the browser vendor's push service. Users can turn off "Show message text in notifications" so only "New message" is sent.
+- If the person being called has the app closed, the call rings through a push notification. They have about 45 seconds to open it and answer.
+- Without the keys, push stays off and the rest of the app works normally.
+
 ## Call history
 The **Calls** tab lists incoming, outgoing, missed, declined and unanswered calls with the contact, time and duration. Tap a row to call that person back (voice or video as before). A red badge counts missed calls you have not seen, and a browser notification appears for a missed call while the tab is in the background. "Clear all" removes the list for you only. Calls are recorded by the server when they ring, connect or end.
 
