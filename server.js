@@ -31,9 +31,14 @@ const app = express(), server = http.createServer(app), io = new Server(server);
 app.use(express.json());
 app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
 // flat layout: only these files are public (server.js and data/ stay private)
-const WEB = new Set(['index.html', 'icon.svg', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'sw.js']);
+const WEB = new Set(['index.html', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png', 'manifest.webmanifest', 'sw.js']);
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/:f', (req, res, next) => WEB.has(req.params.f) ? res.sendFile(path.join(__dirname, req.params.f)) : next());
+// Android app (APK/Play Store) verification file: put the assetlinks.json from PWABuilder in the project root
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  const f = path.join(__dirname, 'assetlinks.json');
+  fs.existsSync(f) ? res.type('application/json').sendFile(f) : res.status(404).json({ error: 'assetlinks.json not set up' });
+});
 const SAFE = /^(image\/(png|jpe?g|gif|webp)|audio\/|video\/(mp4|webm)|application\/pdf)/;
 if (pool) app.get('/uploads/:id', async (req, res) => {
   try {
@@ -86,6 +91,7 @@ const finishCall = (rec, status) => {
   callLog().push({ id: rec.id, from: rec.from, to: rec.to, video: !!rec.video, ts: rec.ts, status, duration, reason: rec.reason || null });
   if (db.calls.length > 5000) db.calls.splice(0, db.calls.length - 5000);
   save(); io.to(rec.from).emit('calls-changed'); io.to(rec.to).emit('calls-changed');
+  if (status === 'missed') pushMissed(rec);
 };
 const logAttempt = (from, to, video, reason) => finishCall({ id: uid() + uid(), from, to, video, ts: Date.now(), reason }, 'missed');
 const dropCall = (n, ev) => {
@@ -96,6 +102,38 @@ const dropCall = (n, ev) => {
   if (ev) io.to(o).emit(ev, { from: n });
 };
 // ---- end call log ----
+
+// ---- web push (notifications when the app is closed) ----
+let webpush = null;
+try { webpush = require('web-push'); } catch { console.warn('web-push is not installed: push notifications disabled'); }
+const pushOn = () => !!(webpush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+if (pushOn()) webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+const PUSH_HOSTS = /^https:\/\/(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|[\w-]+\.push\.services\.mozilla\.com|[\w.-]+\.notify\.windows\.com|web\.push\.apple\.com|[\w-]+\.push\.apple\.com)\//;
+const subsOf = n => (db.pushSubs || []).filter(x => x.number === n);
+async function push(n, payload, opts = {}) {
+  if (!pushOn()) return;
+  const body = JSON.stringify(payload);
+  for (const sub of subsOf(n)) {
+    try { await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, body, { TTL: opts.ttl || 3600, urgency: opts.urgency || 'normal' }); }
+    catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) { db.pushSubs = (db.pushSubs || []).filter(x => x.endpoint !== sub.endpoint); save(); }  // device unsubscribed
+      else console.error('push failed:', e.statusCode || e.message);
+    }
+  }
+}
+const notifyBody = m => m.text ? m.text.slice(0, 120) : m.file
+  ? (String(m.file.type).startsWith('image/') ? '📷 Photo' : String(m.file.type).startsWith('audio/') ? '🎤 Voice note' : String(m.file.type).startsWith('video/') ? '🎥 Video' : '📎 ' + (m.file.name || 'File')) : 'New message';
+function pushMessage(n, m) {
+  if (!pushOn() || !subsOf(n).length) return;
+  const u = userBy(m.from), g = m.chat.startsWith('g:') ? db.groups.find(x => x.id === m.chat.slice(2)) : null;
+  const show = !(userBy(n).settings && userBy(n).settings.preview === false);
+  push(n, { type: 'message', title: g ? g.name : u.name, body: show ? (g ? u.name + ': ' : '') + notifyBody(m) : 'New message', tag: m.chat, chat: m.chat, url: '/?chat=' + encodeURIComponent(m.chat) }).catch(() => {});
+}
+function pushMissed(rec) {
+  if (!pushOn() || !subsOf(rec.to).length) return;
+  push(rec.to, { type: 'missed', title: 'Missed ' + (rec.video ? 'video' : 'voice') + ' call', body: (userBy(rec.from) || {}).name || 'Someone called you', tag: 'call', url: '/?tab=calls' }, { ttl: 86400 }).catch(() => {});
+}
+// ---- end web push ----
 
 const auth = (req, res, next) => {
   try {
@@ -131,6 +169,7 @@ app.put('/api/me', auth, (req, res) => {
       cur.wallpaper = w && w.kind === 'preset' && WALLS.includes(w.id) ? { kind: 'preset', id: w.id }
         : w && w.kind === 'custom' && /^\/uploads\/[\w.\-]+$/.test(String(w.url || '')) ? { kind: 'custom', url: w.url } : null;
     }
+    if ('preview' in st) cur.preview = !!st.preview;
     if ('lang' in st) cur.lang = LANG.test(String(st.lang || '')) ? st.lang : 'English';
     req.user.settings = cur;
   }
@@ -276,6 +315,32 @@ app.get('/api/calls', auth, (req, res) => {
 app.post('/api/calls/seen', auth, (req, res) => { req.user.callsSeenAt = Date.now(); save(); res.json({ ok: true }); });
 app.post('/api/calls/clear', auth, (req, res) => { req.user.callsClearedAt = req.user.callsSeenAt = Date.now(); save(); res.json({ ok: true }); });
 
+// ---- push subscription API ----
+app.get('/api/push/key', auth, (req, res) => res.json({ key: pushOn() ? process.env.VAPID_PUBLIC_KEY : null }));
+app.post('/api/push/subscribe', auth, (req, res) => {
+  if (!pushOn()) return res.status(503).json({ error: 'Push notifications are not set up on the server' });
+  const sub = (req.body || {}).subscription || {}, k = sub.keys || {};
+  const ok = typeof sub.endpoint === 'string' && sub.endpoint.length < 700 && PUSH_HOSTS.test(sub.endpoint)
+    && typeof k.p256dh === 'string' && k.p256dh.length < 200 && typeof k.auth === 'string' && k.auth.length < 100;
+  if (!ok) return res.status(400).json({ error: 'Invalid subscription' });
+  db.pushSubs = (db.pushSubs || []).filter(x => x.endpoint !== sub.endpoint);  // re-subscribing moves the device to this account
+  const mine = db.pushSubs.filter(x => x.number === req.user.number);
+  if (mine.length >= 5) db.pushSubs = db.pushSubs.filter(x => x !== mine[0]);
+  db.pushSubs.push({ number: req.user.number, endpoint: sub.endpoint, keys: { p256dh: k.p256dh, auth: k.auth }, ts: Date.now() });
+  save(); res.json({ ok: true });
+});
+app.post('/api/push/unsubscribe', auth, (req, res) => {
+  const ep = String((req.body || {}).endpoint || '');
+  db.pushSubs = (db.pushSubs || []).filter(x => !(x.endpoint === ep && x.number === req.user.number));
+  save(); res.json({ ok: true });
+});
+app.post('/api/push/test', auth, async (req, res) => {
+  const n = subsOf(req.user.number).length;
+  if (!pushOn() || !n) return res.status(400).json({ error: 'No device is subscribed yet' });
+  await push(req.user.number, { type: 'test', title: 'PHANTOM LINK', body: 'Notifications are working 🎉', tag: 'test', url: '/' });
+  res.json({ sent: n });
+});
+
 // ---- chats, messages, groups ----
 app.get('/api/chats', auth, (req, res) => {
   const me = req.user.number, map = {};
@@ -332,6 +397,8 @@ const notify = (m, chat) => members(chat).forEach(n => io.to(n).emit('status', {
 io.on('connection', s => {
   const me = s.number;
   s.join(me); online.set(me, (online.get(me) || 0) + 1);
+  const ringing = activeCalls.get(me);  // a call that started while their app was closed
+  if (ringing && ringing.to === me && !ringing.answeredAt && ringing.info && Date.now() - ringing.ts < 45000) s.emit('call:incoming', ringing.info);
   io.emit('presence', { number: me, online: true });
   db.messages.forEach(m => {  // deliver anything received while offline
     if (m.from !== me && members(m.chat).includes(me) && !m.deliveredTo.includes(me)) { m.deliveredTo.push(me); notify(m, m.chat); }
@@ -350,6 +417,7 @@ io.on('connection', s => {
       deliveredTo: mem.filter(n => n !== me && online.has(n)), readBy: [me] };
     db.messages.push(m); save();
     mem.forEach(n => io.to(n).emit('message', out(m)));
+    mem.filter(n => n !== me).forEach(n => pushMessage(n, m));
     ack && ack({ ok: true });
   });
   s.on('typing', ({ chat }) => {
@@ -369,14 +437,17 @@ io.on('connection', s => {
     to = String(to || '');
     if (!userBy(to) || to === me) return ack && ack({ error: 'Invalid number' });
     if (peer.has(me)) return ack && ack({ error: 'You are already in a call' });
-    if (!online.has(to)) { logAttempt(me, to, !!video, 'offline'); return ack && ack({ error: 'They are offline right now' }); }
+    const viaPush = !online.has(to) && pushOn() && subsOf(to).length > 0;  // callee's app is closed but they can be notified
+    if (!online.has(to) && !viaPush) { logAttempt(me, to, !!video, 'offline'); return ack && ack({ error: 'They are offline right now' }); }
     if (peer.has(to)) { logAttempt(me, to, !!video, 'busy'); return ack && ack({ error: 'Line busy' }); }
     peer.set(me, to); peer.set(to, me);
     const rec = { id: uid() + uid(), from: me, to, video: !!video, ts: Date.now(), answeredAt: 0 };
     activeCalls.set(me, rec); activeCalls.set(to, rec);
     const u = userBy(me);
-    io.to(to).emit('call:incoming', { from: me, name: u.name, avatar: u.avatar || null, video: !!video });
-    ack && ack({ ok: true });
+    rec.info = { from: me, name: u.name, avatar: u.avatar || null, video: !!video };
+    io.to(to).emit('call:incoming', rec.info);
+    if (pushOn() && subsOf(to).length) push(to, { type: 'call', title: 'Incoming ' + (video ? 'video' : 'voice') + ' call', body: u.name, tag: 'call', url: '/?tab=calls' }, { ttl: 45, urgency: 'high' }).catch(() => {});
+    ack && ack({ ok: true, viaPush });
   });
   s.on('call:accept', ({ to }) => {
     const rec = activeCalls.get(me);

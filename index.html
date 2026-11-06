@@ -166,6 +166,10 @@ html[data-theme=light] .tsw:last-child{color:#14172b;text-shadow:none}
 #cdot{display:none;min-width:16px;height:16px;border-radius:8px;background:#ff4d6d;color:#fff;font-size:10px;font-style:normal;margin-left:6px;line-height:16px;padding:0 4px;box-shadow:0 0 8px #ff4d6d88}
 .miss{color:#ff6b81!important}
 .srow.unseen{background:color-mix(in srgb,#ff4d6d 12%,transparent)}
+#installbar{display:none;align-items:center;gap:8px;padding:8px 12px;background:color-mix(in srgb,var(--p) 16%,transparent);font-size:13px;border-bottom:1px solid var(--line)}
+#installbar .btn{padding:5px 10px;font-size:13px}
+#pushbar{display:none;align-items:center;gap:8px;padding:8px 12px;background:color-mix(in srgb,var(--g) 14%,transparent);font-size:13px;border-bottom:1px solid var(--line)}
+#pushbar .btn{padding:5px 10px;font-size:13px}
 </style></head><body>
 <div id="auth">
  <img src="/icon.svg" alt="PHANTOM LINK">
@@ -184,6 +188,8 @@ html[data-theme=light] .tsw:last-child{color:#14172b;text-shadow:none}
   <div class="brandbar"><img src="/icon.svg" alt=""> PHANTOM LINK</div>
   <div class="top"><div class="me"><span id="meAv" onclick="editProfile()" style="cursor:pointer"></span><div><b id="meName"></b><small id="meNum"></small></div></div>
    <div><button class="ico" title="Settings" onclick="openSettings()">⚙️</button><button class="btn" onclick="newChat()">+ Chat</button> <button class="btn alt" onclick="newGroup()">Group</button></div></div>
+  <div id="installbar"><span style="flex:1">📲 Install PHANTOM LINK as an app: full screen, its own icon, no browser bar.</span><button class="btn" onclick="installApp()">Install</button><button class="ico" title="Not now" onclick="localStorage.installNo='1';hideInstallBar()">✕</button></div>
+  <div id="pushbar"><span style="flex:1">🔔 Turn on notifications to get calls and messages when the app is closed.</span><button class="btn" onclick="enablePush(false).then(hidePushBar)">Turn on</button><button class="ico" title="Not now" onclick="localStorage.pushNo='1';hidePushBar()">✕</button></div>
   <div id="tabs"><button id="tab-chats" class="tab on" onclick="tab('chats')">Chats</button><button id="tab-status" class="tab" onclick="tab('status')">Status<i id="sdot"></i></button><button id="tab-calls" class="tab" onclick="tab('calls')">Calls<i id="cdot"></i></button></div>
   <input id="q" placeholder="Search chats" oninput="renderList()">
   <div id="list"></div>
@@ -231,7 +237,7 @@ async function authGo(kind){
    if(kind==='signup')alert('Your number is '+d.user.number+'. Share it so people can message you!');
    start();}catch(e){$('#err').textContent=e.message}
 }
-function logout(){localStorage.removeItem('t');location.reload()}
+async function logout(){try{await disablePush()}catch{}localStorage.removeItem('t');location.reload()}
 async function init(){if(!token)return;try{me=await api('me');start()}catch{localStorage.removeItem('t')}}
 function start(){
   $('#auth').style.display='none';$('#app').style.display='grid';showMe();
@@ -251,7 +257,7 @@ function start(){
   loadChats();
 }
 function showMe(){$('#meAv').innerHTML=avHtml(me.name,me.avatar);$('#meName').innerHTML=esc(me.name)+vb(me.verified);$('#meNum').innerHTML='+'+esc(me.number)+' · <a href="#" onclick="logout()">log out</a>'}
-function notifyMsg(m){
+function notifyMsg(m){if(localStorage.pushOn==='1'&&document.hidden)return;
   if(!('Notification' in window)||Notification.permission!=='granted'||(!document.hidden&&cur===m.chat))return;
   new Notification(chatInfo(m.chat)?.name||'New message',{body:preview(m),icon:'/icon-192.png'});
 }
@@ -435,6 +441,7 @@ async function makePc(){
 async function flushIce(){for(const c of pendingIce)await pc.addIceCandidate(c).catch(()=>{});pendingIce=[]}
 function callSockets(){
   sock.on('call:incoming',({from,name,avatar,video})=>{
+    if(callPeer===from&&callState==='ringing')return;  // same call delivered again after a reconnect
     if(callState!=='idle'){sock.emit('call:reject',{to:from});return}
     callPeer=from;callVideo=video;callState='ringing';ringInfo={name,video};
     showCall(name,avatar,video?'Incoming video call…':'Incoming voice call…');ui(true);ring(true);
@@ -665,7 +672,7 @@ async function saveSettings(patch){
 }
 function openSettings(){
   const b=(l,fn)=>`<button class="mi" onclick="${fn}">${l}</button>`;
-  openModal('<h3 style="margin:0 0 6px">Settings</h3>'+b('👤 Edit profile','editProfile()')+b('🎨 Themes &amp; chat wallpaper','openAppearance()')+b('📱 My QR code','myQR()')+b('📷 Scan a QR code','scanQR()')+b('🌐 Translation language ('+esc(lang())+')','openLang()')+(me.admin?b('✔ Verify an account','adminVerify()'):'')+b('🚪 Log out','logout()'));
+  openModal('<h3 style="margin:0 0 6px">Settings</h3>'+b('👤 Edit profile','editProfile()')+b('🎨 Themes &amp; chat wallpaper','openAppearance()')+b('📱 My QR code','myQR()')+b('📷 Scan a QR code','scanQR()')+(standalone?'':b('📲 Install as an app','installApp()'))+b('🔔 Notifications','openNotifs()')+b('🌐 Translation language ('+esc(lang())+')','openLang()')+(me.admin?b('✔ Verify an account','adminVerify()'):'')+b('🚪 Log out','logout()'));
 }
 function openAppearance(){
   const s=me.settings||{},t=s.theme||'phantom',w=s.wallpaper;
@@ -815,7 +822,7 @@ function callLabel(c){
 }
 function updateCdot(){const d=$('#cdot');d.style.display=missedN?'inline-block':'none';d.textContent=missedN}
 async function loadCalls(markSeen){
-  try{const r=await api('calls');CALLS=r.calls;missedN=r.missed}catch{return}
+  try{const r=await api('calls');CALLS=r.calls||[];missedN=r.missed||0}catch{return}
   renderCalls();updateCdot();
   if(markSeen&&missedN){api('calls/seen',{method:'POST'}).catch(()=>{});missedN=0;updateCdot()}
 }
@@ -845,5 +852,85 @@ function tab(t){
 }
 const _start4=start;
 start=function(){_start4();sock.on('calls-changed',()=>loadCalls($('#tab-calls').classList.contains('on')));loadCalls(false)};
+// ---------- push notifications ----------
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone;
+const pushSupported=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64u=s=>{const r=atob((s+'='.repeat((4-s.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(r,c=>c.charCodeAt(0))};
+async function enablePush(silent){
+  if(!pushSupported()){if(!silent)toast(isIOS&&!standalone?'On iPhone, first add PHANTOM LINK to your Home Screen (Share, then Add to Home Screen), then turn notifications on':'Push notifications are not supported in this browser');return false}
+  try{
+    if(Notification.permission!=='granted'){
+      if(silent)return false;
+      if(await Notification.requestPermission()!=='granted'){toast('Notifications are blocked. Allow them in your browser or phone settings.');return false}
+    }
+    const {key}=await api('push/key');
+    if(!key){if(!silent)toast('Push is not set up on the server yet');return false}
+    const reg=await navigator.serviceWorker.ready,want=b64u(key);let sub=await reg.pushManager.getSubscription();
+    if(sub){try{if(new Uint8Array(sub.options.applicationServerKey).join()!==want.join()){await sub.unsubscribe();sub=null}}catch{}}
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:want});
+    await api('push/subscribe',{method:'POST',body:JSON.stringify({subscription:sub.toJSON()})});
+    localStorage.pushOn='1';return true;
+  }catch(e){if(!silent)toast(e.message||'Could not turn on notifications');return false}
+}
+async function disablePush(){
+  try{if(pushSupported()){const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+    if(sub){await api('push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe()}}}catch{}
+  localStorage.removeItem('pushOn');
+}
+function openNotifs(){
+  const sup=pushSupported(),on=sup&&localStorage.pushOn==='1'&&Notification.permission==='granted',prev=!(me.settings&&me.settings.preview===false);
+  openModal(`<h3 style="margin:0 0 8px">Notifications</h3>
+   <p class="sub">${sup?(on?'✅ On for this device. You get messages, calls and missed calls even when the app is closed.':'Get messages, calls and missed calls even when the app is closed.'):'This browser does not support push notifications.'+(isIOS&&!standalone?' On iPhone, add PHANTOM LINK to your Home Screen first (Share, then Add to Home Screen).':'')}</p>
+   ${sup?`<div class="row"><button class="btn" onclick="togglePush(${!on})">${on?'Turn off':'Turn on'}</button>${on?'<button class="btn alt" onclick="testPush()">Send a test</button>':''}</div>`:''}
+   <label class="srow" style="cursor:pointer;margin-top:8px"><input type="checkbox" ${prev?'checked':''} style="width:auto;margin:0" onchange="setPreview(this.checked)"><span>Show message text in notifications</span></label>
+   <div class="row" style="margin-top:12px"><button class="btn alt" onclick="openSettings()">Back</button><button class="btn alt" onclick="closeModal()">Close</button></div>`);
+}
+async function togglePush(on){if(on){if(await enablePush(false))toast('Notifications turned on')}else{await disablePush();toast('Notifications turned off')}openNotifs();hidePushBar()}
+async function testPush(){try{const r=await api('push/test',{method:'POST'});toast('Test sent to '+r.sent+' device'+(r.sent>1?'s':'')+(document.hasFocus()?'. Switch to another app to see it.':''))}catch(e){toast(e.message)}}
+async function setPreview(v){await saveSettings({preview:v})}
+function hidePushBar(){$('#pushbar').style.display='none'}
+async function maybePushBar(){
+  if(localStorage.pushOn==='1'){enablePush(true);return}   // quietly refresh the subscription after a new login
+  if(localStorage.pushNo)return;
+  if(!pushSupported())return;
+  if(pushSupported()&&Notification.permission==='denied')return;
+  try{const {key}=await api('push/key');if(!key)return}catch{return}
+  $('#pushbar').style.display='flex';
+}
+// opening a notification: deep links (?chat=... / ?tab=calls) and messages from the service worker
+const _qs=new URLSearchParams(location.search);
+if(/^(dm:\d+:\d+|g:[\w-]+)$/.test(_qs.get('chat')||''))localStorage.pendingChat=_qs.get('chat');
+if(_qs.get('tab')==='calls')localStorage.pendingTab='calls';
+const _start5=start;
+start=function(){
+  _start5();maybePushBar();
+  const pc=localStorage.pendingChat,pt=localStorage.pendingTab;
+  if(pc||pt){
+    localStorage.removeItem('pendingChat');localStorage.removeItem('pendingTab');history.replaceState(null,'',location.pathname);
+    if(pt==='calls')setTimeout(()=>tab('calls'),300);
+    if(pc)setTimeout(()=>{if(chatInfo(pc))openChat(pc)},900);
+  }
+};
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{
+  const d=e.data||{};if(d.type!=='open'||!me)return;
+  if(d.tab==='calls')tab('calls');else if(d.chat&&chatInfo(d.chat))openChat(d.chat);
+});
+// ---------- install as an app ----------
+let installEv=null;
+const hideInstallBar=()=>{$('#installbar').style.display='none'};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;maybeInstallBar()});
+window.addEventListener('appinstalled',()=>{installEv=null;hideInstallBar();toast('PHANTOM LINK installed. Open it from your home screen.')});
+function maybeInstallBar(){
+  if(standalone||localStorage.installNo||!me)return;
+  if(installEv||isIOS)$('#installbar').style.display='flex';
+}
+async function installApp(){
+  if(installEv){installEv.prompt();try{await installEv.userChoice}catch{}installEv=null;hideInstallBar();return}
+  const steps=isIOS?'<ol><li>Open this page in <b>Safari</b>.</li><li>Tap the <b>Share</b> button.</li><li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol><p class="sub">Open it from the new icon. Notifications work after that.</p>'
+   :'<ol><li>Open the browser menu (⋮).</li><li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li><li>Confirm. Open it from the new icon.</li></ol><p class="sub">If you do not see it, open this page in Chrome and wait a few seconds.</p>';
+  openModal('<h3 style="margin:0 0 8px">Install as an app</h3>'+steps+'<div class="row"><button class="btn alt" onclick="closeModal()">Close</button></div>');
+}
+const _start6=start;
+start=function(){_start6();setTimeout(maybeInstallBar,1500)};
 init();
 </script></body></html>
